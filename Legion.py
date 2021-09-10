@@ -52,19 +52,25 @@ def random_bytes(nbytes):
     return int_to_bytes(random.getrandbits(nbytes * 8), nbytes)
 
 
-def write_testcase(file_xml, lines):
-    with open(file_xml, "wt") as stream:
+def write_testcase(lines, path, identifier):
+    sp.run(['mkdir', '-p', path])
+    test_xml = path + '/' + str(identifier) + '.xml'
+
+    with open(test_xml, "wt") as stream:
         stream.write(
             '<?xml version="1.0" encoding="UTF-8" standalone="no"?>\n')
         stream.write(
             '<!DOCTYPE testcase PUBLIC "+//IDN sosy-lab.org//DTD test-format testcase 1.1//EN" "https://sosy-lab.org/test-format/testcase-1.1.dtd">\n')
         stream.write('<testcase>\n')
         for line in lines:
-            stream.write(str(line))
+            stream.write(line.decode('utf-8'))
         stream.write('</testcase>\n')
 
 
-def execute_with_input(binary, data, trace_smt2):
+def execute_with_input(binary, data, path, identifier):
+    sp.run(['mkdir', '-p', path])
+    trace_smt2 = path + '/' + str(identifier) + '.smt2'
+
     env = { 'SYMCC_LOG_FILE': trace_smt2 }
     process = sp.Popen(binary, stdin=sp.PIPE, stdout=sp.PIPE, stderr=sp.PIPE, close_fds=True, env=env)
 
@@ -83,7 +89,7 @@ def execute_with_input(binary, data, trace_smt2):
     outs = list(process.stdout.readlines())
     errs = list(process.stderr.readlines())
 
-    return code, outs, errs
+    return code, outs, errs, trace_smt2
 
 
 def compile_c(source_c, binary):
@@ -97,15 +103,19 @@ if __name__ == '__main__':
     args     = parser.parse_args()
 
     source_c = args.file
+    trace_smt2 = 'trace.smt2'
     assert source_c[-2:] == '.c'
     binary   = "./" + source_c[:-2]
 
     compile_c(source_c, binary)
 
-    code, outs, errs = execute_with_input(binary, bytes(), 'trace.smt2')
-    write_testcase('test.xml', outs)
+    code, outs, errs, trace = execute_with_input(binary, bytes(), 'traces', 1)
+    write_testcase(outs, 'tests', 1)
 
-    constraints = constraints_from_file('trace.smt2')
+    target = target_from_file(trace)
+    print(target)
+
+    constraints = constraints_from_file(trace)
     print(constraints)
 
     # solver  = z3.Optimize()
