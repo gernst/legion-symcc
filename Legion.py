@@ -13,8 +13,8 @@ MAX_LEVEL   = 1
 DECLARE_FUN = re.compile('\(declare-fun (stdin[0-9]+) \(\) \(_ BitVec ([0-9]+)\)\)')
 
 
-def target_from_file(trace_smt2):
-    with open(trace_smt2, "rt") as stream:
+def target_from_file(trace):
+    with open(trace, "rt") as stream:
         consts = []
         for line in stream.readlines():
             match = DECLARE_FUN.match(line)
@@ -33,20 +33,65 @@ def target_from_file(trace_smt2):
         return None
 
 
-def constraints_from_file(trace_smt2):
+def constraints_from_file(trace):
     solver = z3.Solver()
-    solver.from_file(trace_smt2)
+    solver.from_file(trace)
     return solver.assertions()
 
 
 class Node:
-    def __init__(self, constraint):
-        pass
+    def __init__(self, constraints):
+        self.children    = {}
+        self.constraints = constraints
+        self.sampler     = None
+
+    def insert(self, index, constraints):
+        if index == len(constraints):
+            return None # leaf node, no new subtree
+        else:
+            phi = constraints[index]
+            if phi in children:
+                child = children[phi]
+                return child.insert(index + 1, constraints)
+            else:
+                child = Node(constraints[:index])
+                children[phi] = child
+                child.insert(index + 1, constraints)
+                return child # return root of new subtree
+
+    def sample(self):
+        if not self.sampler:
+            solver = z3.Optimize()
+
+            solver.add(self.constraints)
+            solver.check()
+            model = solver.model()
+
+            names = sorted([x.name() for x in model])
+            upto  = names[-1]
+
+            self.sampler = bvsampler.bvsampler(solver, target)
+
+    def select(self):
+        if random_bit():
+            return self
+        else:
+            
+
+
+
+def insert(root, constraints):
+    child = root.insert(0, constraints)
+    print("found new path")
+    return child
 
 
 def int_to_bytes(value, nbytes):
     return value.to_bytes(nbytes, 'little')
 
+
+def random_bit():
+    return random.getrandbits(1):
 
 def random_bytes(nbytes):
     return int_to_bytes(random.getrandbits(nbytes * 8), nbytes)
@@ -54,9 +99,9 @@ def random_bytes(nbytes):
 
 def write_testcase(lines, path, identifier):
     sp.run(['mkdir', '-p', path])
-    test_xml = path + '/' + str(identifier) + '.xml'
+    test = path + '/' + str(identifier) + '.xml'
 
-    with open(test_xml, "wt") as stream:
+    with open(test, "wt") as stream:
         stream.write(
             '<?xml version="1.0" encoding="UTF-8" standalone="no"?>\n')
         stream.write(
@@ -69,9 +114,9 @@ def write_testcase(lines, path, identifier):
 
 def execute_with_input(binary, data, path, identifier):
     sp.run(['mkdir', '-p', path])
-    trace_smt2 = path + '/' + str(identifier) + '.smt2'
+    trace = path + '/' + str(identifier) + '.smt2'
 
-    env = { 'SYMCC_LOG_FILE': trace_smt2 }
+    env = { 'SYMCC_LOG_FILE': trace }
     process = sp.Popen(binary, stdin=sp.PIPE, stdout=sp.PIPE, stderr=sp.PIPE, close_fds=True, env=env)
 
     # write initial input
@@ -89,7 +134,7 @@ def execute_with_input(binary, data, path, identifier):
     outs = list(process.stdout.readlines())
     errs = list(process.stderr.readlines())
 
-    return code, outs, errs, trace_smt2
+    return code, outs, errs, trace
 
 
 def compile_c(source_c, binary):
@@ -103,7 +148,7 @@ if __name__ == '__main__':
     args     = parser.parse_args()
 
     source_c = args.file
-    trace_smt2 = 'trace.smt2'
+
     assert source_c[-2:] == '.c'
     binary   = "./" + source_c[:-2]
 
