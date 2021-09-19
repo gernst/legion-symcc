@@ -39,49 +39,114 @@ def constraints_from_file(trace):
     return solver.assertions()
 
 
+def trace_from_file(trace):
+    with open(trace, "rt") as stream:
+        nbytes   = 0
+        target   = None
+        decls    = {}
+
+        polarity = None
+        pending  = []
+
+        result   = []
+
+        def flush():
+            if polarity is not None:
+                ast = "(assert " + " ".join(pending) + ")"
+                assert(ast)
+
+                constraint, = z3.parse_smt2_string(ast, decls = decls)
+                if polarity is False:
+                    constraint = z3.Not(constraint)
+
+                event = (target, constraint)
+                result.append(event)
+
+                pending.clear()
+
+        for line in stream.readlines():
+            line = line.strip()
+
+            if line.startswith('in  '):
+                flush()
+
+                k = int(line[4:])
+                n = "stdin" + str(k)
+                x = z3.BitVec(n, 8)
+                assert(k == nbytes)
+                nbytes = nbytes + 1
+
+                decls[n] = x
+
+                if target is None:
+                    target = x
+                else:
+                    target = z3.Concat(target, x)
+
+            elif line.startswith('yes '):
+                flush()
+                polarity = True
+                pending.append(line[4:])
+
+            elif line.startswith('no '):
+                flush()
+                polarity = False
+                pending.append(line[4:])
+
+            else:
+                pending.append(line)
+
+        flush()
+        return result
+
+
 class Node:
-    def __init__(self, constraints):
+    def __init__(self, trace):
         self.children    = {}
-        self.constraints = constraints
+        self.constraints = []
+        self.target      = None
         self.sampler     = None
 
-    def insert(self, index, constraints):
-        if index == len(constraints):
+        for _, constraint in trace:
+            self.constraints.append(constraint)
+
+    def insert(self, index, trace):
+        if index == len(trace):
             return None # leaf node, no new subtree
         else:
-            phi = constraints[index]
-            if phi in children:
-                child = children[phi]
-                return child.insert(index + 1, constraints)
+            phi = trace[index]
+            if phi in self.children:
+                child = self.children[phi]
+                return child.insert(index + 1, trace)
             else:
-                child = Node(constraints[:index])
-                children[phi] = child
-                child.insert(index + 1, constraints)
+                child = Node(trace[:index])
+                self.children[phi] = child
+                child.insert(index + 1, trace)
                 return child # return root of new subtree
 
     def sample(self):
+        if not self.target:
+            return b'' # no bytes to sample
+
         if not self.sampler:
             solver = z3.Optimize()
-
-            solver.add(self.constraints)
-            solver.check()
-            model = solver.model()
-
-            names = sorted([x.name() for x in model])
-            upto  = names[-1]
-
             self.sampler = bvsampler.bvsampler(solver, target)
 
+        sample = self.sampler.next()
+        return int_to_bytes(sample)
+
     def select(self):
-        if random_bit():
+        if not self.children():
+            return self
+        elif random_bit():
             return self
         else:
-            
+            child = random.choice(self.children)
+            return child.select()
 
 
-
-def insert(root, constraints):
-    child = root.insert(0, constraints)
+def insert(root, trace):
+    child = root.insert(0, trace)
     print("found new path")
     return child
 
@@ -91,7 +156,7 @@ def int_to_bytes(value, nbytes):
 
 
 def random_bit():
-    return random.getrandbits(1):
+    return random.getrandbits(1)
 
 def random_bytes(nbytes):
     return int_to_bytes(random.getrandbits(nbytes * 8), nbytes)
@@ -154,14 +219,21 @@ if __name__ == '__main__':
 
     compile_c(source_c, binary)
 
-    code, outs, errs, trace = execute_with_input(binary, bytes(), 'traces', 1)
+    code, outs, errs, log = execute_with_input(binary, bytes(), 'traces', 1)
     write_testcase(outs, 'tests', 1)
 
-    target = target_from_file(trace)
-    print(target)
+    trace = trace_from_file(log)
+    for foo in trace:
+        print(foo)
 
-    constraints = constraints_from_file(trace)
-    print(constraints)
+    root = Node([])
+    insert(root, trace)
+
+    # target = target_from_file(trace)
+    # print(target)
+
+    # constraints = constraints_from_file(trace)
+    # print(constraints)
 
     # solver  = z3.Optimize()
     # solver.from_file(args.file)
