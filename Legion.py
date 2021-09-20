@@ -77,7 +77,7 @@ def trace_from_file(trace):
                 if target is None:
                     target = x
                 else:
-                    target = z3.Concat(target, x)
+                    target = z3.Concat(x, target)
 
             elif line.startswith('yes '):
                 flush()
@@ -100,7 +100,7 @@ class Node:
     def __init__(self, target, constraints, parent = None):
         self.site        = None
         self.target      = target
-        self.nbytes      = target.size() if target is not None else 0
+        self.nbytes      = target.size() // 8 if target is not None else 0
         self.constraints = constraints
         self.depth       = len(constraints)
 
@@ -110,6 +110,7 @@ class Node:
         self.sampler     = None
 
         self.phantom     = True
+        self.exhausted   = False
         self.selected    = 0
 
     def insert(self, trace, constraints=[], index=0):
@@ -146,10 +147,19 @@ class Node:
 
         if self.sampler is None:
             solver = z3.Optimize()
+            solver.add(self.constraints)
+            # print("constraints", self.constraints)
+            # print("target     ", self.target, " with size", self.nbytes)
             self.sampler = bvsampler.bvsampler(solver, self.target)
 
-        sample = next(self.sampler)
-        return int_to_bytes(sample, self.nbytes)
+        try:
+            sample = next(self.sampler)
+            inputs = int_to_bytes(sample, self.nbytes)
+            print(inputs.hex())
+            return inputs
+        except StopIteration:
+            self.exhausted = True
+            return None
 
     def select(self):
         if not self.children:
@@ -242,6 +252,8 @@ if __name__ == '__main__':
         # print("depth", node.depth, " #selected ", node.selected, "select", node.site)
         
         prefix = node.sample()
+        if prefix is None:
+            continue
         
         code, outs, errs, log = execute_with_input(binary, prefix, 'traces', i)
         trace = trace_from_file(log)
@@ -252,7 +264,7 @@ if __name__ == '__main__':
             write_testcase(outs, 'tests', i)
             print("new: ", path)
         else:
-            # print("old: ", path)
+            print("old: ", path)
             pass
 
     # target = target_from_file(trace)
