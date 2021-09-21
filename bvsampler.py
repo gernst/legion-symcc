@@ -15,21 +15,24 @@ import functools
 # https://stackoverflow.com/questions/39299015/sum-of-all-the-bits-in-a-bit-vector-of-z3
 def bvcount(b):
     n = b.size()
-    bits = [ z3.Extract(i, i, b) for i in range(n) ]
-    bvs  = [ z3.Concat(z3.BitVecVal(0, n - 1), b) for b in bits ]
-    nb   = functools.reduce(lambda a, b: a + b, bvs)
+    bits = [z3.Extract(i, i, b) for i in range(n)]
+    bvs = [z3.Concat(z3.BitVecVal(0, n - 1), b) for b in bits]
+    nb = functools.reduce(lambda a, b: a + b, bvs)
     return nb
+
 
 def bvcount_chunks(b, k):
     n = b.size()
     assert n % k == 0
     m = n // k
-    bits = [ z3.Extract((i+1)*k-1, i*k, b) for i in range(m) ]
-    bvs  = [ z3.Concat(z3.BitVecVal(0, n - m), b) for b in bits ]
-    nb   = functools.reduce(lambda a, b: a + b, bvs)
+    bits = [z3.Extract((i + 1) * k - 1, i * k, b) for i in range(m)]
+    bvs = [z3.Concat(z3.BitVecVal(0, n - m), b) for b in bits]
+    nb = functools.reduce(lambda a, b: a + b, bvs)
     return nb
 
+
 MAX_LEVEL = 6
+
 
 def bvsampler(solver, target):
     assert target
@@ -42,8 +45,8 @@ def bvsampler(solver, target):
 
     n = target.size()
 
-    delta  = z3.BitVec('delta',  n)
-    result = z3.BitVec('result', n)
+    delta = z3.BitVec("delta", n)
+    result = z3.BitVec("result", n)
     solver.add(result == target)
 
     # bit-wise distance metric is sloooow
@@ -70,7 +73,7 @@ def bvsampler(solver, target):
         if solver.check() != z3.sat:
             break
 
-        model   = solver.model()
+        model = solver.model()
         result0 = model[result].as_long()
         solver.pop()
 
@@ -82,7 +85,7 @@ def bvsampler(solver, target):
         # print('model: ' + str(model))
 
         mutations = {}
-        
+
         solver.push()
 
         for i in range(n):
@@ -93,7 +96,7 @@ def bvsampler(solver, target):
             solver.add(z3.Extract(i, i, delta) == 0x1)
 
             if solver.check() == z3.sat:
-                model   = solver.model()
+                model = solver.model()
                 result1 = model[result].as_long()
 
                 if result1 not in results:
@@ -108,7 +111,7 @@ def bvsampler(solver, target):
                     if level > MAX_LEVEL:
                         continue
 
-                    candidate = (result0 ^ ((result0^value) | (result0^result1)))
+                    candidate = result0 ^ ((result0 ^ value) | (result0 ^ result1))
                     # print('yielding candidate ' + str(candidate) + ' at level ' + str(level))
                     if candidate not in results:
                         results.add(candidate)
@@ -134,8 +137,8 @@ def naive(solver, target):
 
     n = target.size()
 
-    delta  = z3.BitVec('delta',  n)
-    result = z3.BitVec('result', n)
+    delta = z3.BitVec("delta", n)
+    result = z3.BitVec("result", n)
     solver.add(result == target)
 
     solver.minimize(delta)
