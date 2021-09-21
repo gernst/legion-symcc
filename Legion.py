@@ -228,7 +228,10 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Legion')
     parser.add_argument("-c", "--compile",
                         action='store_true',
-                        help='force compile')
+                        help='compile binary (otherwise assume it has been compiled before)')
+    parser.add_argument("-i", "--iterations",
+                        type=int, default=10,
+                        help='number of iterations (samples to generate)')
     parser.add_argument("file",
                         help='C source file')
     args     = parser.parse_args()
@@ -243,7 +246,7 @@ if __name__ == '__main__':
 
     root = Node(None, [])
 
-    for i in range(1,1001):
+    for i in range(1,args.iterations+1):
         # print("round", i)
         node   = root.select()
         node.selected += 1
@@ -262,8 +265,8 @@ if __name__ == '__main__':
 
             if added:
                 write_testcase(outs, 'tests', i)
-                print("with input", prefix.hex())
-                print("new path", path)
+                print("new path     ", path)
+                print("input prefix ", prefix.hex())
                 print()
             else:
                 # print("old: ", path)
