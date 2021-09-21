@@ -127,12 +127,10 @@ def naive(solver, target):
     assert target
     assert type(target) == list
 
-    target.reverse()
-
     if len(target) == 1:
         target = target[0]
     else:
-        target = z3.Concat(target)
+        target = z3.Concat(list(reversed(target)))
 
     n = target.size()
 
@@ -157,8 +155,9 @@ def naive(solver, target):
         if solver.check() != z3.sat:
             break
 
-        model  = solver.model()
+        model = solver.model()
         value = model[result].as_long()
+
         solver.pop()
 
         results.add(value)

@@ -297,9 +297,14 @@ if __name__ == '__main__':
     parser.add_argument("-i", "--iterations",
                         type=int, default=10,
                         help='number of iterations (samples to generate)')
+    parser.add_argument("-s", "--seed",
+                        type=int, default=0,
+                        help='random seed')
     parser.add_argument("file",
                         help='C source file')
     args     = parser.parse_args()
+
+    random.seed(args.seed)
 
     if args.file[-2:] == '.c':
         binary = args.file[:-2]
@@ -311,38 +316,37 @@ if __name__ == '__main__':
 
     root = Node([], '*', [], False)
 
-    for i in range(1, args.iterations+1):
-        if root.is_explored:
-            print('explored')
-            break
+    try:
+        for i in range(1, args.iterations+1):
+            if root.is_explored:
+                print('explored')
+                break
 
-        # print("round", i)
-        node   = root.select()
-        node.selected += 1
-        # print("depth", node.depth, " #selected ", node.selected, "at", node.path)
-        
-        # print("?", node.path)
+            node   = root.select()
+            node.selected += 1
 
-        prefix = node.sample()
-        if prefix is None:
-            continue
+            prefix = node.sample()
+            if prefix is None:
+                continue
 
-        print(".", node.path, prefix.hex())
-        
-        code, outs, errs, path = execute_with_input(binary, prefix, 'traces', 'trace')
+            print("?", node.path.ljust(32), prefix.hex())
+            
+            code, outs, errs, path = execute_with_input(binary, prefix, 'traces', 'trace')
 
-        trace = trace_from_file(path)
-        added, leaf = root.insert(trace)
-        _, _, path, _ = zip(*trace)
+            trace = trace_from_file(path)
+            added, leaf = root.insert(trace)
+            _, _, path, _ = zip(*trace)
 
-        if added:
-            write_testcase(outs, 'tests', i)
-            print("+", leaf.path)
-        elif not leaf.path.startswith(node.path):
-            print("-", leaf.path) # missed a prefix
-            raise Exception('failed to preserve prefix (naive sampler is precise)')
+            if added:
+                write_testcase(outs, 'tests', i)
+                print("+", leaf.path)
+            elif not leaf.path.startswith(node.path):
+                print("!", leaf.path) # missed a prefix
+                raise Exception('failed to preserve prefix (naive sampler is precise)')
 
-    print('done')
-    print()
+        print('done')
+        print()
+    except:
+        pass
 
     root.print()
