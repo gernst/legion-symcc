@@ -340,6 +340,7 @@ if __name__ == '__main__':
             print("+", leaf.path)
         elif not leaf.path.startswith(node.path):
             print("-", leaf.path) # missed a prefix
+            raise Exception('failed to preserve prefix (naive sampler is precise)')
 
     print('done')
     print()

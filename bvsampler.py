@@ -127,6 +127,8 @@ def naive(solver, target):
     assert target
     assert type(target) == list
 
+    target.reverse()
+
     if len(target) == 1:
         target = target[0]
     else:
