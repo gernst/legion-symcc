@@ -1,0 +1,6 @@
+__VERIFIER.o
+__VERIFIER.s
+__pycache__/
+tests/
+traces/
+log/
