@@ -8,31 +8,13 @@ import random
 import bvsampler
 import subprocess as sp
 
-def target_from_file(trace):
-    with open(trace, "rt") as stream:
-        consts = []
-        for line in stream.readlines():
-            match = DECLARE_FUN.match(line)
-            if match:
-                name = str(match[1])
-                bits = int(match[2])
-                var  = z3.BitVec(name, bits)
-                consts.append(var)
-
-    if consts:
-        # assemble input vector
-        # z3.Concat is n-ary but requires at least two arguments m(
-        return functools.reduce(lambda a, b: z3.Concat(a, b), consts)
-    else:
-        # the program is deterministic, we are done
-        return None
-
-
-def constraints_from_file(trace):
-    solver = z3.Solver()
-    solver.from_file(trace)
-    return solver.assertions()
-
+def constraint_from_string(ast, decls):
+    try:
+        constraint, = z3.parse_smt2_string(ast, decls = decls)
+        return constraint
+    except:
+        write_smt2_trace(ast, decls, 'log', 'error')
+        raise ValueError('Z3 parser error', ast)
 
 def trace_from_file(trace):
     with open(trace, "rt") as stream:
@@ -52,8 +34,8 @@ def trace_from_file(trace):
                 assert(ast)
 
                 # parse_smt2_* returns a list
-                constraint, = z3.parse_smt2_string(ast, decls = decls)
-                event       = (site, target, polarity, constraint)
+                constraint = constraint_from_string(ast, decls)
+                event      = (site, target, polarity, constraint)
                 result.append(event)
 
                 pending.clear()
@@ -155,7 +137,6 @@ class Node:
         try:
             sample = next(self.sampler)
             inputs = int_to_bytes(sample, self.nbytes)
-            print(inputs.hex())
             return inputs
         except StopIteration:
             self.exhausted = True
@@ -184,9 +165,9 @@ def random_bytes(nbytes):
 
 def write_testcase(lines, path, identifier):
     sp.run(['mkdir', '-p', path])
-    test = path + '/' + str(identifier) + '.xml'
+    path = path + '/' + str(identifier) + '.xml'
 
-    with open(test, "wt") as stream:
+    with open(path, "wt") as stream:
         stream.write(
             '<?xml version="1.0" encoding="UTF-8" standalone="no"?>\n')
         stream.write(
@@ -197,11 +178,28 @@ def write_testcase(lines, path, identifier):
         stream.write('</testcase>\n')
 
 
+def write_smt2_trace(ast, decls, path, identifier):
+    decls = [x.decl().sexpr() for _, x in decls.items()]
+    decls = sorted(decls)
+
+    sp.run(['mkdir', '-p', path])
+    path = path + '/' + str(identifier) + '.smt2'
+
+    with open(path, "wt") as stream:
+        for decl in decls:
+            stream.write(decl)
+            stream.write('\n')
+
+        stream.write(ast)
+
+
 def execute_with_input(binary, data, path, identifier):
     sp.run(['mkdir', '-p', path])
-    trace = path + '/' + str(identifier) + '.smt2'
+    path = path + '/' + str(identifier) + '.txt'
 
-    env = { 'SYMCC_LOG_FILE': trace }
+    env = { 'SYMCC_LOG_FILE': path,
+            'SYMCC_TIMEOUT':  '1' }
+
     process = sp.Popen(binary, stdin=sp.PIPE, stdout=sp.PIPE, stderr=sp.PIPE, close_fds=True, env=env)
 
     # write initial input
@@ -219,7 +217,7 @@ def execute_with_input(binary, data, path, identifier):
     outs = list(process.stdout.readlines())
     errs = list(process.stderr.readlines())
 
-    return code, outs, errs, trace
+    return code, outs, errs, path
 
 
 def compile_c(source_c, binary):
@@ -245,7 +243,7 @@ if __name__ == '__main__':
 
     root = Node(None, [])
 
-    for i in range(1,11):
+    for i in range(1,1001):
         # print("round", i)
         node   = root.select()
         node.selected += 1
@@ -255,32 +253,20 @@ if __name__ == '__main__':
         if prefix is None:
             continue
         
-        code, outs, errs, log = execute_with_input(binary, prefix, 'traces', i)
-        trace = trace_from_file(log)
-        added = root.insert(trace)
-        _, _, path, _ = zip(*trace)
+        code, outs, errs, path = execute_with_input(binary, prefix, 'traces', 'trace')
 
-        if added:
-            write_testcase(outs, 'tests', i)
-            print("new: ", path)
-        else:
-            print("old: ", path)
-            pass
+        try:
+            trace = trace_from_file(path)
+            added = root.insert(trace)
+            _, _, path, _ = zip(*trace)
 
-    # target = target_from_file(trace)
-    # print(target)
-
-    # constraints = constraints_from_file(trace)
-    # print(constraints)
-
-    # solver  = z3.Optimize()
-    # solver.from_file(args.file)
-
-    # target  = target_from_file(args.file)
-    # bits    = target.size()
-    # sampler = bvsampler.bvsampler(solver, target)
-
-    # results = list(itertools.islice(sampler, 100))
-    # for result in results:
-    #     print(type(result))
-    #     print(result)
+            if added:
+                write_testcase(outs, 'tests', i)
+                print("with input", prefix.hex())
+                print("new path", path)
+                print()
+            else:
+                # print("old: ", path)
+                pass
+        except:
+            print('error')
