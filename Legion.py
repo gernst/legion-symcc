@@ -1,5 +1,6 @@
 #!/usr/bin/python3
 
+import sys
 import z3
 import argparse
 import functools
@@ -19,7 +20,7 @@ def constraint_from_string(ast, decls):
 def trace_from_file(trace):
     with open(trace, "rt") as stream:
         nbytes   = 0
-        target   = None
+        target   = []
         decls    = {}
 
         polarity = None
@@ -55,11 +56,7 @@ def trace_from_file(trace):
                 nbytes = nbytes + 1
 
                 decls[n] = x
-
-                if target is None:
-                    target = x
-                else:
-                    target = z3.Concat(x, target)
+                target.append(x)
 
             elif line.startswith('yes '):
                 flush()
@@ -79,78 +76,133 @@ def trace_from_file(trace):
 
 
 class Node:
-    def __init__(self, target, constraints, parent = None):
-        self.site        = None
-        self.target      = target
-        self.nbytes      = target.size() // 8 if target is not None else 0
-        self.constraints = constraints
-        self.depth       = len(constraints)
-
-        self.parent      = parent
-        self.children    = {}
+    def __init__(self, target, path, constraints, parent = None):
+        self.site         = None
         
-        self.sampler     = None
+        self.target       = target
+        self.nbytes       = len(target)
 
-        self.phantom     = True
-        self.exhausted   = False
-        self.selected    = 0
+        self.path         = path
+        self.constraints  = constraints
+        self.depth        = len(constraints)
 
-    def insert(self, trace, constraints=[], index=0):
+        self.parent       = parent
+
+        self.yes          = None
+        self.no           = None
+        
+        self.sampler      = None
+
+        self.is_phantom   = True
+        self.is_leaf      = False
+        self.is_exhausted = False # do not sample at this particular node
+        self.is_explored  = False # do not sample anywhere in the subtree
+        self.selected     = 0
+
+    def insert(self, trace, path = '', constraints=[], index=0):
         if index < len(trace):
             site, target, polarity, phi = trace[index]
 
             yes = phi
             no  = z3.Not(phi)
+            bit = '1' if polarity else '0'
             phi = yes if polarity else no
 
             if self.site:
                 assert self.site == site
             else:
                 self.site = site
-            
-            if not self.children:
-                self.children[True]  = Node(target, constraints + [yes], parent=self)
-                self.children[False] = Node(target, constraints + [no],  parent=self)
-            
-            child  = self.children[polarity]
-            result = child.insert(trace, constraints + [phi], index + 1)
-        else:
-            result = None
 
-        if self.phantom:
-            self.phantom = False
-            return self
+            if self.is_phantom:
+                self.yes = Node(target, path + '1', constraints + [yes], parent=self)
+                self.no  = Node(target, path + '0', constraints + [no],  parent=self)
+
+            child  = self.yes if polarity else self.no
+            base, leaf = child.insert(trace, path + bit, constraints + [phi], index + 1)
         else:
-            return result
+            self.is_leaf      = True
+            self.is_exhausted = True
+            self.is_explored  = True
+            self.check_explored()
+            base, leaf = None, self
+
+        if self.is_phantom:
+            self.is_phantom = False
+            return self, leaf
+        else:
+            return base, leaf
 
     def sample(self):
-        if self.target is None:
+        if not self.target:
+            self.is_exhausted = True
             return b'' # no bytes to sample
 
         if self.sampler is None:
             solver = z3.Optimize()
             solver.add(self.constraints)
-            # print("constraints", self.constraints)
             # print("target     ", self.target, " with size", self.nbytes)
-            self.sampler = bvsampler.bvsampler(solver, self.target)
+            # print("constraints", self.constraints)
+            self.sampler = bvsampler.naive(solver, self.target)
 
         try:
             sample = next(self.sampler)
             inputs = int_to_bytes(sample, self.nbytes)
             return inputs
         except StopIteration:
-            self.exhausted = True
+            self.is_exhausted = True
+            self.check_explored()
             return None
 
-    def select(self):
-        if not self.children:
-            return self
-        elif random_bit():
-            return self
-        else:
-            child = random.choice(self.children)
-            return child.select()
+    def check_explored(self):
+        self.is_explored = True
+        if self.yes and not self.yes.is_explored:
+            self.is_explored = False
+        if self.no  and not self.no.is_explored:
+            self.is_explored = False
+        
+        if self.parent:
+            self.parent.check_explored()
 
+    def select(self):
+        assert not self.is_explored
+
+        options = []
+
+        if not self.is_exhausted:
+            options.append(self)
+        if self.yes and not self.yes.is_explored:
+            options.append(self.yes)
+        if self.no  and not self.no.is_explored:
+            options.append(self.no)
+
+        assert options
+
+        node = random.choice(options)
+        
+        if node is self:
+            return node
+        else:
+            return node.select()
+
+    def print(self):
+        if not self.parent:
+            key = '*'
+        elif self.is_leaf:
+            key = '$'
+        elif self.is_explored:
+            key = 'e'
+        elif self.is_phantom:
+            key = '?'
+        else:
+            key = '.'
+
+        selected = "%4d" % self.selected
+        print(key, selected, self.path)
+
+        if self.no:
+            self.no.print()
+        if self.yes:
+            self.yes.print()
 
 def int_to_bytes(value, nbytes):
     return value.to_bytes(nbytes, 'little')
@@ -223,12 +275,25 @@ def execute_with_input(binary, data, path, identifier):
 def compile_c(source_c, binary):
 	sp.run(['symcc', source_c, '__VERIFIER.c', '-o', binary])
 
+def z3_check_sparse_models():
+    solver = z3.Optimize()
+    x = z3.BitVec('x', 8)
+    y = z3.BitVec('y', 8)
+    solver.add(x > 0)
+    solver.add(y == y)
+    assert solver.check() == z3.sat
+    model = solver.model()
+    names = [v.name() for v in model]
+    assert 'x' in names
+    assert 'y' not in names
+    assert names == ['x']
+    del(solver)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Legion')
-    parser.add_argument("-c", "--compile",
-                        action='store_true',
-                        help='compile binary (otherwise assume it has been compiled before)')
+    # parser.add_argument("-c", "--compile",
+    #                     action='store_true',
+    #                     help='compile binary (requires modified symcc on path, otherwise assume it has been compiled before)')
     parser.add_argument("-i", "--iterations",
                         type=int, default=10,
                         help='number of iterations (samples to generate)')
@@ -236,40 +301,47 @@ if __name__ == '__main__':
                         help='C source file')
     args     = parser.parse_args()
 
-    source_c = args.file
+    if args.file[-2:] == '.c':
+        binary = args.file[:-2]
+        compile_c(args.file, binary)
+    else:
+        binary = args.file
 
-    assert source_c[-2:] == '.c'
-    binary   = "./" + source_c[:-2]
+    z3_check_sparse_models()
 
-    if args.compile:
-        compile_c(source_c, binary)
+    root = Node([], '*', [], False)
 
-    root = Node(None, [])
+    for i in range(1, args.iterations+1):
+        if root.is_explored:
+            print('explored')
+            break
 
-    for i in range(1,args.iterations+1):
         # print("round", i)
         node   = root.select()
         node.selected += 1
-        # print("depth", node.depth, " #selected ", node.selected, "select", node.site)
+        # print("depth", node.depth, " #selected ", node.selected, "at", node.path)
         
+        # print("?", node.path)
+
         prefix = node.sample()
         if prefix is None:
             continue
+
+        print(".", node.path, prefix.hex())
         
         code, outs, errs, path = execute_with_input(binary, prefix, 'traces', 'trace')
 
-        try:
-            trace = trace_from_file(path)
-            added = root.insert(trace)
-            _, _, path, _ = zip(*trace)
+        trace = trace_from_file(path)
+        added, leaf = root.insert(trace)
+        _, _, path, _ = zip(*trace)
 
-            if added:
-                write_testcase(outs, 'tests', i)
-                print("new path     ", path)
-                print("input prefix ", prefix.hex())
-                print()
-            else:
-                # print("old: ", path)
-                pass
-        except:
-            print('error')
+        if added:
+            write_testcase(outs, 'tests', i)
+            print("+", leaf.path)
+        elif not leaf.path.startswith(node.path):
+            print("-", leaf.path) # missed a prefix
+
+    print('done')
+    print()
+
+    root.print()

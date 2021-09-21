@@ -1,5 +1,6 @@
 import random
 import z3
+import functools
 
 # Author: Gidon Ernst, gidon.ernst (*) gmail.com
 # BSD 3 clause license
@@ -16,20 +17,41 @@ def bvcount(b):
     n = b.size()
     bits = [ z3.Extract(i, i, b) for i in range(n) ]
     bvs  = [ z3.Concat(z3.BitVecVal(0, n - 1), b) for b in bits ]
-    nb   = reduce(lambda a, b: a + b, bvs)
+    nb   = functools.reduce(lambda a, b: a + b, bvs)
+    return nb
+
+def bvcount_chunks(b, k):
+    n = b.size()
+    assert n % k == 0
+    m = n // k
+    bits = [ z3.Extract((i+1)*k-1, i*k, b) for i in range(m) ]
+    bvs  = [ z3.Concat(z3.BitVecVal(0, n - m), b) for b in bits ]
+    nb   = functools.reduce(lambda a, b: a + b, bvs)
     return nb
 
 MAX_LEVEL = 6
 
 def bvsampler(solver, target):
+    assert target
+    assert type(target) == list
+
+    if len(target) == 1:
+        target = target[0]
+    else:
+        target = z3.Concat(target)
+
     n = target.size()
 
     delta  = z3.BitVec('delta',  n)
     result = z3.BitVec('result', n)
     solver.add(result == target)
 
-    # this distance metric is sloooow
+    # bit-wise distance metric is sloooow
     # solver.minimize(bvcount(delta))
+
+    # byte-wise distance metric might work
+    # note currently the chunks must add up to whole vector
+    # solver.minimize(bvcount_chunks(delta, 8))
 
     solver.minimize(delta)
 
@@ -99,3 +121,43 @@ def bvsampler(solver, target):
             solver.pop()
 
         solver.pop()
+
+
+def naive(solver, target):
+    assert target
+    assert type(target) == list
+
+    if len(target) == 1:
+        target = target[0]
+    else:
+        target = z3.Concat(target)
+
+    n = target.size()
+
+    delta  = z3.BitVec('delta',  n)
+    result = z3.BitVec('result', n)
+    solver.add(result == target)
+
+    solver.minimize(delta)
+
+    results = set()
+
+    while True:
+        # print('---------------------------')
+        guess = z3.BitVecVal(random.getrandbits(n), n)
+
+        solver.push()
+        solver.add(result ^ delta == guess)
+
+        for known in results:
+            solver.add(result != known)
+
+        if solver.check() != z3.sat:
+            break
+
+        model  = solver.model()
+        value = model[result].as_long()
+        solver.pop()
+
+        results.add(value)
+        yield value
