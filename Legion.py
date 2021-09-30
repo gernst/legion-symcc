@@ -1,7 +1,6 @@
 #!/usr/bin/python3
 
 import argparse
-import bvsampler
 import datetime
 import functools
 import itertools
@@ -14,6 +13,7 @@ import z3
 from math import sqrt, log, ceil, inf
 
 RHO = 1
+INPUTS = set()
 
 def constraint_from_string(ast, decls):
     try:
@@ -36,6 +36,8 @@ def trace_from_file(trace):
 
         result = []
 
+        ok = None
+
         def flush():
             if pending:
                 ast = "(assert " + " ".join(pending) + ")"
@@ -50,8 +52,11 @@ def trace_from_file(trace):
 
         for line in stream.readlines():
             line = line.strip()
+
             if not line:
                 continue
+
+            assert ok is None
 
             if line.startswith("in  "):
                 flush()
@@ -75,11 +80,21 @@ def trace_from_file(trace):
                 polarity = False
                 site = int(line[4:])
 
+            elif line.startswith("ok"):
+                flush()
+                ok = True
+
+            elif line.startswith("to"):
+                flush()
+                ok = False
+
             else:
                 pending.append(line)
 
         flush()
-        return result
+        assert ok is not None
+        return (ok, result)
+
 
 # higher is better
 def uct(w, n, N):
@@ -89,6 +104,44 @@ def uct(w, n, N):
         exploit = w / n
         explore = RHO * sqrt(2 * log(N) / n)
         return exploit + explore
+
+def naive(solver, target):
+    assert target
+    assert type(target) == list
+
+    if len(target) == 1:
+        target = target[0]
+    else:
+        target = z3.Concat(list(reversed(target)))
+
+    n = target.size()
+
+    delta = z3.BitVec("delta", n)
+    result = z3.BitVec("result", n)
+    solver.add(result == target)
+
+    solver.minimize(delta)
+
+    while True:
+        # print('---------------------------')
+        guess = z3.BitVecVal(random.getrandbits(n), n)
+
+        solver.push()
+        solver.add(result ^ delta == guess)
+
+        for known in INPUTS:
+            solver.add(result != known)
+
+        if solver.check() != z3.sat:
+            break
+
+        model = solver.model()
+        value = model[result].as_long()
+
+        solver.pop()
+
+        INPUTS.add(value)
+        yield value
 
 class Arm:
     def __init__(self, node):
@@ -106,6 +159,7 @@ class Arm:
     def descr(self, N):
         return "uct(%d, %d, %d)" % (self.reward, self.selected, N)
 
+
 class Node:
     def __init__(self, target, path, constraints, parent=None):
         self.site = None
@@ -119,24 +173,57 @@ class Node:
 
         self.parent = parent
         self.yes = None
-        self.no  = None
+        self.no = None
 
         self.sampler = None
 
-        self.is_phantom   = True
-        self.is_leaf      = False
+        self.is_phantom = True
+        self.is_leaf = False
 
         # do not sample at this particular node
         self.is_exhausted = False
         # do not sample anywhere in the subtree
-        self.is_explored  = False
+        self.is_explored = False
 
         # statistics collected for sampling in this node and subtree, respectively
         self.here = Arm(self)
         self.tree = Arm(self)
 
+    def check_invariants(self):
+        try:
+            if self.parent:
+                assert self.target
+
+            if self.is_phantom:
+                assert not self.site
+                assert not self.is_leaf
+                assert not self.yes
+                assert not self.no
+                # assert not self.is_exhausted
+                # assert not self.is_explored
+            elif self.is_leaf:
+                assert not self.yes
+                assert not self.no
+                assert self.is_exhausted
+                assert self.is_explored
+            else:
+                assert self.site
+                assert self.yes
+                assert self.no
+
+                if self.is_explored:
+                    # assert self.is_exhausted
+                    assert self.yes.is_explored
+                    assert self.no.is_explored
+
+                self.yes.check_invariants()
+                self.no.check_invariants()
+        except AssertionError as e:
+            print("!", self.path)
+            raise e
+
     def propagate(self, reward, selected, here=True):
-        if here: # to this node
+        if here:  # to this node
             self.here.reward += reward
             self.here.selected += selected
 
@@ -151,15 +238,24 @@ class Node:
             self.is_exhausted = True
 
         if self.is_leaf:
+            assert here
             self.is_explored = True
-        elif not self.is_phantom:
+        elif self.is_phantom:
+            assert here
+            # everything below self is truly dead code
+            self.is_explored = True
+        else:
             self.is_explored = self.yes.is_explored and self.no.is_explored
 
         if self.parent:
-            self.parent.exhaust(here=False) # don't know yet
+            self.parent.exhaust(here=False)  # don't know yet
 
-    def insert(self, trace, path="", constraints=[], index=0):
+    def insert(self, trace, is_complete, path="", constraints=[], index=0):
+        was_phantom = self.is_phantom
+
         if index < len(trace):
+            assert not self.is_leaf
+
             site, target, polarity, phi = trace[index]
 
             yes = phi
@@ -167,32 +263,36 @@ class Node:
             bit = "1" if polarity else "0"
             phi = yes if polarity else no
 
-            if self.site:
-                assert self.site == site
-            else:
+            if was_phantom:
+                self.is_phantom = False
                 self.site = site
-
-            if self.is_phantom:
                 self.yes = Node(target, path + "1", constraints + [yes], parent=self)
                 self.no = Node(target, path + "0", constraints + [no], parent=self)
 
             child = self.yes if polarity else self.no
-            base, leaf = child.insert(trace, path + bit, constraints + [phi], index + 1)
+            base, leaf = child.insert(
+                trace, is_complete, path + bit, constraints + [phi], index + 1
+            )
+        elif not is_complete:
+            print("integrated partial trace")
+            base, leaf = None, self
         else:
             self.is_leaf = True
+            self.is_phantom = False
+            # print("exhaust leaf at", self.path)
             self.exhaust()
             base, leaf = None, self
 
-        if self.is_phantom:
-            self.is_phantom = False
+        if was_phantom:
             return self, leaf
         else:
             return base, leaf
 
     def sample(self):
-        assert not self.is_explored
+        assert not self.is_exhausted
 
         if not self.target:
+            # print("exhaust non-target at", self.path)
             self.exhaust()
             return b""  # no bytes to sample
 
@@ -201,7 +301,7 @@ class Node:
             solver.add(self.constraints)
             # print("target     ", self.target, " with size", self.nbytes)
             # print("constraints", self.constraints)
-            self.sampler = bvsampler.naive(solver, self.target)
+            self.sampler = naive(solver, self.target)
 
         try:
             sample = next(self.sampler)
@@ -209,22 +309,35 @@ class Node:
             return inputs
 
         except StopIteration:
+            # print("exhaust via sampler", self.path)
             self.exhaust()
             return None
 
     def select(self):
+        assert not self.is_leaf
         assert not self.is_explored
 
-        if self.is_phantom or self.is_leaf:
+        if self.is_phantom:
+            if self.is_exhausted:
+                print("unexpected exhausted node in select")
+                self.print()
+                print()
+            assert not self.is_exhausted
             return self
         else:
-            options = [self.here, self.yes.tree, self.no.tree]
+            options = []
+            if not self.is_exhausted:
+                options.append(self.here)
+            if not self.yes.is_explored:
+                options.append(self.yes.tree)
+            if not self.no.is_explored:
+                options.append(self.no.tree)
 
             N = self.tree.selected
 
             # print([arm.descr(N) for arm in options])
             # print([arm.score(N) for arm in options])
-            
+
             candidates = []
             best = -inf
 
@@ -242,6 +355,7 @@ class Node:
             node = arm.node
 
             if node is self:
+                assert not self.is_exhausted
                 return node
             else:
                 return node.select()
@@ -252,19 +366,24 @@ class Node:
         elif self.is_leaf:
             key = "$"
         elif self.is_explored:
+            key = "E"
+        elif self.is_exhausted:
             key = "e"
         elif self.is_phantom:
             key = "?"
         else:
             key = "."
 
-        selected = "%4d/%4d" % (self.tree.reward, self.tree.selected)
-        print(key, selected, self.path)
+        if key != ".":
+            a = "%2d/%2d" % (self.here.reward, self.here.selected)
+            b = "%2d/%2d" % (self.tree.reward, self.tree.selected)
+            print(key, a, b, self.path)
 
-        if self.no:
-            self.no.print()
-        if self.yes:
-            self.yes.print()
+        if key != "E":
+            if self.no:
+                self.no.print()
+            if self.yes:
+                self.yes.print()
 
 
 def int_to_bytes(value, nbytes):
@@ -338,11 +457,14 @@ def write_smt2_trace(ast, decls, path, identifier):
         stream.write(ast)
 
 
-def execute_with_input(binary, data, path, identifier):
+def execute_with_input(binary, data, path, identifier, timeout=None):
     sp.run(["mkdir", "-p", path])
     path = path + "/" + str(identifier) + ".txt"
 
-    env = {"SYMCC_LOG_FILE": path, "SYMCC_TIMEOUT": "1"}
+    if timeout:
+        env = {"SYMCC_LOG_FILE": path, "SYMCC_TIMEOUT": str(timeout)}
+    else:
+        env = {"SYMCC_LOG_FILE": path}
 
     process = sp.Popen(
         binary, stdin=sp.PIPE, stdout=sp.PIPE, stderr=sp.PIPE, close_fds=True, env=env
@@ -366,11 +488,13 @@ def execute_with_input(binary, data, path, identifier):
     return code, outs, errs, path
 
 
-def compile_c(source_c, binary):
-    sp.run(["symcc", source_c, "__VERIFIER.c", "-o", binary])
+def compile_symcc(source, binary):
+    sp.run(["symcc", source, "__VERIFIER.c", "-o", binary])
+
 
 def zip_files(file, paths):
     sp.run(["zip", "-r", file, *paths])
+
 
 def z3_check_sparse_models():
     solver = z3.Optimize()
@@ -392,14 +516,19 @@ if __name__ == "__main__":
     # parser.add_argument("-c", "--compile",
     #                     action='store_true',
     #                     help='compile binary (requires modified symcc on path, otherwise assume it has been compiled before)')
-    parser.add_argument("-z", "--zip",
-                        action='store_true',
-                        help='zip test suite')
+    parser.add_argument("-z", "--zip", action="store_true", help="zip test suite")
     parser.add_argument(
         "-i",
         "--iterations",
         type=int,
         default=10,
+        help="number of iterations (samples to generate)",
+    )
+    parser.add_argument(
+        "-t",
+        "--timeout",
+        type=int,
+        default=1,
         help="number of iterations (samples to generate)",
     )
     parser.add_argument("-s", "--seed", type=int, default=0, help="random seed")
@@ -413,7 +542,7 @@ if __name__ == "__main__":
 
     if is_c:
         binary = source[:-2]
-        compile_c(source, binary)
+        compile_symcc(source, binary)
     else:
         binary = source
         source = binary + ".c"
@@ -427,46 +556,66 @@ if __name__ == "__main__":
 
     # try:
     for i in range(1, args.iterations + 1):
-        if root.is_explored:
-            print("explored")
-            break
-
-        node = root.select()
-        # node.selected += 1
-
-        prefix = node.sample()
-        if prefix is None:
-            node.propagate(0, 1)
-            print("~", node.path.ljust(32))
-            continue
-        else:
-            print("?", node.path.ljust(32), prefix.hex())
-
-        code, outs, errs, path = execute_with_input(
-            binary, prefix, "traces", "trace"
-        )
-
         try:
-            trace = trace_from_file(path)
-        except:
-            node.propagate(0, 1)
-            print("timeout")
-            continue
+            # root.print()
+            root.check_invariants()
 
-        added, leaf = root.insert(trace)
-        _, _, path, _ = zip(*trace)
+            if root.is_explored:
+                print("explored")
+                break
 
-        if added:
-            node.propagate(1, 1)
-        else:
-            node.propagate(0, 1)
+            node = root.select()
+            # node.selected += 1
 
-        if added:
-            write_testcase(outs, "tests/" + stem, i)
-            print("+", leaf.path)
-        elif not leaf.path.startswith(node.path):
-            print("!", leaf.path)  # missed a prefix
-            raise Exception("failed to preserve prefix (naive sampler is precise)")
+            prefix = node.sample()
+            if prefix is None:
+                node.propagate(0, 1)
+                print("E", node.path.ljust(32))
+                continue
+            else:
+                print("?", node.path.ljust(32), prefix.hex())
+
+            code, outs, errs, path = execute_with_input(
+                binary, prefix, "traces", "trace", args.timeout
+            )
+
+            try:
+                is_complete, trace = trace_from_file(path)
+            except:
+                node.propagate(0, 1)
+                print("timeout")
+                continue
+
+            if not is_complete:
+                # node.propagate(0, 1)
+                print("timeout")
+                # continue
+
+            if not trace:
+                print("deterministic")
+                break
+
+            bits = ["1" if bit else "0" for (_, _, bit, _) in trace]
+            print("<", "".join(bits))
+
+            added, leaf = root.insert(trace, is_complete)
+            _, _, path, _ = zip(*trace)
+
+            if added:
+                node.propagate(1, 1)
+            else:
+                node.propagate(0, 1)
+
+            if added:
+                write_testcase(outs, "tests/" + stem, i)
+                print("+", leaf.path)
+            elif not leaf.path.startswith(node.path):
+                print("!", leaf.path)  # missed a prefix
+                raise Exception("failed to preserve prefix (naive sampler is precise)")
+        except Exception as e:
+            print("current tree")
+            root.print()
+            raise e
 
     print("done")
     print()
