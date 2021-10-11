@@ -15,6 +15,7 @@ from math import sqrt, log, ceil, inf
 RHO = 1
 INPUTS = set()
 
+
 def constraint_from_string(ast, decls):
     try:
         (constraint,) = z3.parse_smt2_string(ast, decls=decls)
@@ -37,6 +38,7 @@ def trace_from_file(trace):
         result = []
 
         ok = None
+        last = None
 
         def flush():
             if pending:
@@ -56,6 +58,7 @@ def trace_from_file(trace):
             if not line:
                 continue
 
+            last = line
             assert ok is None
 
             if line.startswith("in  "):
@@ -82,18 +85,20 @@ def trace_from_file(trace):
 
             elif line.startswith("ok"):
                 flush()
+                last = line
                 ok = True
 
             elif line.startswith("to"):
                 flush()
+                last = line
                 ok = False
 
             else:
                 pending.append(line)
 
         flush()
-        assert ok is not None
-        return (ok, result)
+        # assert ok is not None
+        return (ok, last, result)
 
 
 # higher is better
@@ -104,6 +109,7 @@ def uct(w, n, N):
         exploit = w / n
         explore = RHO * sqrt(2 * log(N) / n)
         return exploit + explore
+
 
 def naive(solver, target):
     assert target
@@ -142,6 +148,7 @@ def naive(solver, target):
 
         INPUTS.add(value)
         yield value
+
 
 class Arm:
     def __init__(self, node):
@@ -320,7 +327,7 @@ class Node:
         if self.is_phantom:
             if self.is_exhausted:
                 print("unexpected exhausted node in select")
-                self.print()
+                self.pp()
                 print()
             assert not self.is_exhausted
             return self
@@ -360,7 +367,7 @@ class Node:
             else:
                 return node.select()
 
-    def print(self):
+    def pp(self):
         if not self.parent:
             key = "*"
         elif self.is_leaf:
@@ -381,9 +388,9 @@ class Node:
 
         if key != "E":
             if self.no:
-                self.no.print()
+                self.no.pp()
             if self.yes:
-                self.yes.print()
+                self.yes.pp()
 
 
 def int_to_bytes(value, nbytes):
@@ -531,6 +538,12 @@ if __name__ == "__main__":
         default=1,
         help="number of iterations (samples to generate)",
     )
+    parser.add_argument(
+        "-T",
+        "--testcov",
+        action="store_true",
+        help="run testcov (implies -z)",
+    )
     parser.add_argument("-s", "--seed", type=int, default=0, help="random seed")
     parser.add_argument("file", help="C source file")
     args = parser.parse_args()
@@ -557,7 +570,7 @@ if __name__ == "__main__":
     # try:
     for i in range(1, args.iterations + 1):
         try:
-            # root.print()
+            # root.pp()
             root.check_invariants()
 
             if root.is_explored:
@@ -580,18 +593,20 @@ if __name__ == "__main__":
             )
 
             try:
-                is_complete, trace = trace_from_file(path)
-            except:
+                is_complete, last, trace = trace_from_file(path)
+            except Exception as e:
                 node.propagate(0, 1)
-                print("timeout")
+                print("invalid trace:", e)
                 continue
 
             if not is_complete:
                 # node.propagate(0, 1)
-                print("timeout")
+                print("partial trace: ", last)
                 # continue
 
             if not trace:
+                # testcov wants an empty test case
+                write_testcase(b"", "tests/" + stem, i)
                 print("deterministic")
                 break
 
@@ -614,7 +629,7 @@ if __name__ == "__main__":
                 raise Exception("failed to preserve prefix (naive sampler is precise)")
         except Exception as e:
             print("current tree")
-            root.print()
+            root.pp()
             raise e
 
     print("done")
@@ -622,7 +637,13 @@ if __name__ == "__main__":
     # except:
     #     print("error")
 
-    root.print()
+    root.pp()
 
-    if args.zip:
-        zip_files("tests/" + stem + ".zip", ["tests/" + stem])
+    if args.testcov or args.zip:
+        suite = "tests/" + stem + ".zip"
+        zip_files(suite, ["tests/" + stem])
+        print("testcov -64 --no-isolation --no-plots --test-suite", suite, source)
+
+        if args.testcov:
+            cmd = ["testcov", "-64", "--no-isolation", "--no-plots", "--test-suite", suite, source]
+            sp.run(cmd)

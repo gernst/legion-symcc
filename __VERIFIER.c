@@ -1,7 +1,12 @@
 #include <stdio.h>
+#include <stdlib.h>
 #include <unistd.h>
 
 extern ssize_t read_symbolized(int fd, void *buf, size_t count);
+
+void abort() {
+    exit(0);
+}
 
 _Bool __VERIFIER_nondet_bool() {
     _Bool x = 0;
