@@ -499,9 +499,9 @@ def execute_with_input(binary, data, path, identifier, timeout=None):
 
 def compile_symcc(source, binary):
     if BITS == 32:
-        cmd = ["symcc", "-m32", source, "__VERIFIER.c", "-o", binary]
+        cmd = ["./symcc", "-m32", source, "__VERIFIER.c", "-o", binary]
     elif BITS == 64:
-        cmd = ["symcc", "-m64", source, "__VERIFIER.c", "-o", binary]
+        cmd = ["./symcc", "-m64", source, "__VERIFIER.c", "-o", binary]
     print(*cmd)
     sp.run(cmd, stderr=sp.STDOUT)
 
@@ -574,7 +574,7 @@ if __name__ == "__main__":
     random.seed(args.seed)
 
     source = args.file
-    is_c = source[-2:] == ".c"
+    is_c = source[-2:] == ".c" or source[-2:] == ".i"
 
     if args.m32:
         BITS = 32
@@ -677,7 +677,7 @@ if __name__ == "__main__":
 
         if args.m32:
             cmd.append("-32")
-        elif args.m64:
+        else:
             cmd.append("-64")
 
         cmd.extend(
@@ -690,7 +690,7 @@ if __name__ == "__main__":
             ]
         )
 
+        print(*cmd)
+
         if args.testcov:
             sp.run(cmd, stderr=sp.STDOUT)
-        else:
-            print(*cmd)
