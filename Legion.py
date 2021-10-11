@@ -14,6 +14,8 @@ from math import sqrt, log, ceil, inf
 
 RHO = 1
 INPUTS = set()
+VERSION = "testcomp2022"
+BITS = 64
 
 
 def constraint_from_string(ast, decls):
@@ -427,7 +429,7 @@ def write_metadata(file, path):
         stream.write("  <programfile>{}</programfile>\n".format(file))
         stream.write("  <programhash>{}</programhash>\n".format(sha256sum(file)))
         stream.write("  <entryfunction>main</entryfunction>\n")
-        stream.write("  <architecture>64bit</architecture>\n")
+        stream.write("  <architecture>{}bit</architecture>\n".format(BITS))
         stream.write(
             "  <creationtime>{}</creationtime>\n".format(datetime.datetime.now())
         )
@@ -496,7 +498,12 @@ def execute_with_input(binary, data, path, identifier, timeout=None):
 
 
 def compile_symcc(source, binary):
-    sp.run(["symcc", source, "__VERIFIER.c", "-o", binary], stderr=sp.STDOUT)
+    if BITS == 32:
+        cmd = ["symcc", "-m32", source, "__VERIFIER.c", "-o", binary]
+    elif BITS == 64:
+        cmd = ["symcc", "-m64", source, "__VERIFIER.c", "-o", binary]
+    print(*cmd)
+    sp.run(cmd, stderr=sp.STDOUT)
 
 
 def zip_files(file, paths):
@@ -519,11 +526,27 @@ def z3_check_sparse_models():
 
 
 if __name__ == "__main__":
+    if len(sys.argv) == 2 and (sys.argv[1] == "-v" or sys.argv[1] == "--version"):
+        print(VERSION)
+        sys.exit(0)
+
     parser = argparse.ArgumentParser(description="Legion")
     # parser.add_argument("-c", "--compile",
     #                     action='store_true',
     #                     help='compile binary (requires modified symcc on path, otherwise assume it has been compiled before)')
     parser.add_argument("-z", "--zip", action="store_true", help="zip test suite")
+    parser.add_argument(
+        "-64",
+        dest="m64",
+        action="store_true",
+        help="Compile with -m64 (override platform default)",
+    )
+    parser.add_argument(
+        "-32",
+        dest="m32",
+        action="store_true",
+        help="Compile with -m32 (override platform default)",
+    )
     parser.add_argument(
         "-i",
         "--iterations",
@@ -552,6 +575,11 @@ if __name__ == "__main__":
 
     source = args.file
     is_c = source[-2:] == ".c"
+
+    if args.m32:
+        BITS = 32
+    elif args.m64:
+        BITS = 64
 
     if is_c:
         binary = source[:-2]
@@ -638,12 +666,31 @@ if __name__ == "__main__":
     #     print("error")
 
     root.pp()
+    print()
 
     if args.testcov or args.zip:
         suite = "tests/" + stem + ".zip"
         zip_files(suite, ["tests/" + stem])
-        print("testcov -64 --no-isolation --no-plots --test-suite", suite, source)
+        print()
+
+        cmd = ["testcov"]
+
+        if args.m32:
+            cmd.append("-32")
+        elif args.m64:
+            cmd.append("-64")
+
+        cmd.extend(
+            [
+                "--no-isolation",
+                "--no-plots",
+                "--test-suite",
+                suite,
+                source,
+            ]
+        )
 
         if args.testcov:
-            cmd = ["testcov", "-64", "--no-isolation", "--no-plots", "--test-suite", suite, source]
             sp.run(cmd, stderr=sp.STDOUT)
+        else:
+            print(*cmd)
