@@ -496,7 +496,7 @@ def execute_with_input(binary, data, path, identifier, timeout=None):
 
 
 def compile_symcc(source, binary):
-    sp.run(["symcc", source, "__VERIFIER.c", "-o", binary])
+    sp.run(["symcc", source, "__VERIFIER.c", "-o", binary], stderr=sp.STDOUT)
 
 
 def zip_files(file, paths):
@@ -646,4 +646,4 @@ if __name__ == "__main__":
 
         if args.testcov:
             cmd = ["testcov", "-64", "--no-isolation", "--no-plots", "--test-suite", suite, source]
-            sp.run(cmd)
+            sp.run(cmd, stderr=sp.STDOUT)
