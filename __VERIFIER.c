@@ -4,15 +4,12 @@
 
 extern ssize_t read_symbolized(int fd, void *buf, size_t count);
 
-void abort() {
-    exit(0);
-}
-
 _Bool __VERIFIER_nondet_bool() {
-    _Bool x = 0;
+    char x = 0;
     read_symbolized(0, &x, sizeof(x));
-    printf("  <input type=\"bool\">%d</input>\n", x);
-    return x;
+    _Bool y = x >=0;
+    printf("  <input type=\"bool\">%d</input>\n", y);
+    return y;
 }
 
 char __VERIFIER_nondet_char() {

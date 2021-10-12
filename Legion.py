@@ -85,12 +85,17 @@ def trace_from_file(trace):
                 polarity = False
                 site = int(line[4:])
 
-            elif line.startswith("ok"):
+            elif line.startswith("exit"):
                 flush()
                 last = line
                 ok = True
 
-            elif line.startswith("to"):
+            elif line.startswith("abort"):
+                flush()
+                last = line
+                ok = False
+
+            elif line.startswith("timeout"):
                 flush()
                 last = line
                 ok = False
@@ -500,68 +505,33 @@ def execute_with_input(binary, data, path, identifier, timeout=None):
 def run(*args):
     print(*args)
     sp.run(args, stderr=sp.STDOUT)
+     
+def compile_symcc(libs, source, binary):
+    cmd = ["clang"]
 
+    cmd.extend([
+        "-Xclang", "-load", "-Xclang", libs + "/libSymbolize.so"
+    ])
 
-def compile_symcc(source, binary):
     if BITS == 32:
-        run("./symcc", "-m32", source, "__VERIFIER.c", "-lstdc++", "-o", binary)
+        rpath = libs + "32"
+        cmd.append("-m32")
     elif BITS == 64:
-        run("./symcc", "-m64", source, "__VERIFIER.c", "-lstdc++", "-o", binary)
+        rpath = libs
+        cmd.append("-m64")
+    else:
+        rpath = libs
 
+    cmd.extend([
+        source, "__VERIFIER.c", "-o", binary
+    ])
 
-def make_dependencies():
-    run(
-        "clang",
-        "-std=c++17",
-        "-Wall",
-        "compiler/Main.cpp",
-        "compiler/Pass.cpp",
-        "compiler/Runtime.cpp",
-        "compiler/Symbolizer.cpp",
-        "-Wall",
-        "-fPIC",
-        "-D_GNU_SOURCE",
-        "-D__STDC_CONSTANT_MACROS",
-        "-D__STDC_FORMAT_MACROS",
-        "-D__STDC_LIMIT_MACROS",
-        "-Wl,-z,nodelete",
-        "-shared",
-        "-o",
-        "lib/libSymbolize.so",
-    )
-    run(
-        "clang",
-        "-std=c++17",
-        "-Wall",
-        "runtime/Config.cpp",
-        "runtime/GarbageCollection.cpp",
-        "runtime/LibcWrappers.cpp",
-        "runtime/RuntimeCommon.cpp",
-        "runtime/Runtime.cpp",
-        "runtime/Shadow.cpp",
-        "-Iruntime",
-        "-fPIC",
-        "-shared",
-        "-o",
-        "lib/libSymRuntime.so",
-    )
-    run(
-        "clang",
-        "-std=c++17",
-        "-Wall",
-        "runtime/Config.cpp",
-        "runtime/GarbageCollection.cpp",
-        "runtime/LibcWrappers.cpp",
-        "runtime/RuntimeCommon.cpp",
-        "runtime/Runtime.cpp",
-        "runtime/Shadow.cpp",
-        "-Iruntime",
-        "-fPIC",
-        "-shared",
-        "-o",
-        "lib32/libSymRuntime.so",
-        "-m32",
-    )
+    cmd.append("-lstdc++")
+    cmd.append("-lSymRuntime")
+    cmd.append("-L" + rpath)
+    cmd.append("-Wl,-rpath," + rpath)
+    
+    run(*cmd)
 
 
 def zip_files(file, paths):
@@ -622,30 +592,20 @@ if __name__ == "__main__":
         help="number of iterations (samples to generate)",
     ),
     parser.add_argument(
-        "-r",
-        "--repeat",
-        default=1,
-        type=int,
-        help="try each symbolic soluton several times",
-    )
+        "-L",
+        dest="library",
+        default="lib",
+        help="location of SymCC compiler and runtime libraries",
+    ),
     parser.add_argument(
         "-T",
         "--testcov",
         action="store_true",
         help="run testcov (implies -z)",
     )
-    parser.add_argument(
-        "-D",
-        "--dependencies",
-        action="store_true",
-        help="compile all dependencies for this platform",
-    )
     args = parser.parse_args()
 
     random.seed(args.seed)
-
-    if args.dependencies:
-        make_dependencies()
 
     source = args.file
     is_c = source[-2:] == ".c" or source[-2:] == ".i"
@@ -657,7 +617,7 @@ if __name__ == "__main__":
 
     if is_c:
         binary = source[:-2]
-        compile_symcc(source, binary)
+        compile_symcc(args.library, source, binary)
     else:
         binary = source
         source = binary + ".c"
@@ -688,48 +648,52 @@ if __name__ == "__main__":
                 print("E", node.path.ljust(32))
                 continue
             else:
-                print("?", node.path.ljust(32), prefix.hex())
+                print("?", node.path.ljust(32), "input: " + prefix.hex())
 
-            for r in range(1, args.repeat + 1):
-                code, outs, errs, path = execute_with_input(
-                    binary, prefix, "traces", "trace", args.timeout
-                )
+            code, outs, errs, path = execute_with_input(
+                binary, prefix, "traces", "trace", args.timeout
+            )
 
-                try:
-                    is_complete, last, trace = trace_from_file(path)
-                except Exception as e:
-                    node.propagate(0, 1)
-                    print("invalid trace")
-                    continue
+            if errs:
+                print("stderr:")
+                for line in errs:
+                    print(line.decode("utf-8"))
 
-                if not is_complete:
-                    # node.propagate(0, 1)
-                    print("partial trace: ", last)
-                    # continue
+            try:
+                ok, last, trace = trace_from_file(path)
+            except Exception as e:
+                node.propagate(0, 1)
+                print("invalid trace", e)
+                continue
 
-                if not trace:
-                    # testcov wants an empty test case
-                    write_testcase(b"", "tests/" + stem, i)
-                    print("deterministic")
-                    break
+            if not ok:
+                # node.propagate(0, 1)
+                print("partial trace: ", last)
+                # continue
 
-                bits = ["1" if bit else "0" for (_, _, bit, _) in trace]
-                print("<", "".join(bits))
+            if not trace:
+                # testcov wants an empty test case
+                write_testcase(b"", "tests/" + stem, i)
+                print("deterministic")
+                break
 
-                added, leaf = root.insert(trace, is_complete)
-                _, _, path, _ = zip(*trace)
+            bits = ["1" if bit else "0" for (_, _, bit, _) in trace]
+            print("<", "".join(bits))
 
-                if added:
-                    node.propagate(1, 1)
-                else:
-                    node.propagate(0, 1)
+            added, leaf = root.insert(trace, ok)
+            _, _, path, _ = zip(*trace)
 
-                if added:
-                    write_testcase(outs, "tests/" + stem, i)
-                    print("+", leaf.path)
-                elif not leaf.path.startswith(node.path):
-                    print("!", leaf.path)  # missed a prefix
-                    raise Exception("failed to preserve prefix (naive sampler is precise)")
+            if added:
+                node.propagate(1, 1)
+            else:
+                node.propagate(0, 1)
+
+            if added:
+                write_testcase(outs, "tests/" + stem, i)
+                print("+", leaf.path)
+            elif not leaf.path.startswith(node.path):
+                print("!", leaf.path)  # missed a prefix
+                raise Exception("failed to preserve prefix (naive sampler is precise)")
         except Exception as e:
             print("current tree")
             root.pp()

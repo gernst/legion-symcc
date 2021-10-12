@@ -103,19 +103,23 @@ namespace {
     Expr g_null_pointer(hexadecimal(0, 8 * sizeof(void *)), 8 * sizeof(void *), nullptr);
     Expr g_true("true", 0, nullptr);
     Expr g_false("false", 0, nullptr);
-    Expr g_extract("extract", 0, nullptr);
     Expr g_zero("0", 0, nullptr);
+    Expr g_bit0("#b0", 1, nullptr);
 }
 
 void _sym_finalize(void) {
     *out << std::endl; // clear any partial output
-    *out << "ok" << std::endl;
+    *out << "exit" << std::endl;
+}
+
+void _sym_abort(int code) {
+    *out << std::endl; // clear any partial output
+    *out << "abort" << std::endl;
 }
 
 void _sym_timeout(int) {
     *out << std::endl; // clear any partial output
-    *out << "to" << std::endl;
-    abort();
+    *out << "timeout" << std::endl;
 }
 
 void _sym_initialize(void) {
@@ -135,6 +139,7 @@ void _sym_initialize(void) {
 
     if(g_config.executionTimeout > 0) {
         signal(SIGALRM, _sym_timeout);
+        signal(SIGABRT, _sym_abort);
         alarm(g_config.executionTimeout);
     }
 
@@ -196,6 +201,7 @@ SymExpr _sym_build_##name(SymExpr a, SymExpr b) \
 
 BINARY(equal, "=", ZERO2)
 
+UNARY(bool_not, "not", ZERO1)
 BINARY(bool_and, "and", ZERO2)
 BINARY(bool_or, "or", ZERO2)
 BINARY(bool_xor, "xor", ZERO2)
@@ -259,11 +265,19 @@ Expr * _sym_build_float_to_unsigned_integer(Expr * expr, uint8_t bits) { abort()
 Expr * _sym_build_bool_to_bits(Expr * expr, uint8_t bits) {
     Expr * one = _sym_build_integer(1, bits);
     Expr * zero = _sym_build_integer(0, bits);
-    return EXPR("ite", bits, expr, one, zero);
+    switch(expr->bits) {
+        case 0:
+            return EXPR("ite", bits, expr, one, zero);
+        case 1:
+            return EXPR("ite", bits, _sym_build_not_equal(expr, &g_bit0), one, zero);
+        default:
+            assert(expr->bits == 0 || expr->bits == 1);
+            return nullptr;
+    }
 }
 
 Expr * _sym_build_not_equal(Expr * a, Expr * b) {
-    return _sym_build_not(_sym_build_equal(a, b));
+    return _sym_build_bool_not(_sym_build_equal(a, b));
 }
 
 Expr * _sym_build_sext(Expr * expr, uint8_t bits) {
@@ -285,16 +299,19 @@ Expr * _sym_build_zext(Expr * expr, uint8_t bits) {
 }
 
 Expr * _sym_build_trunc(Expr * expr, uint8_t bits) {
-    return _sym_extract_helper(expr, bits, 0);
+    return _sym_extract_helper(expr, bits - 1, 0);
 }
 
 void _sym_push_path_constraint(Expr * constraint, int taken,
                                uintptr_t site_id) {
-  if (constraint == nullptr)
-    return;
+    if (constraint == nullptr)
+        return;
 
-  *out << (taken ? "yes " : "no  ") << site_id << std::endl;
-  *out << *constraint << std::endl;
+    if(constraint->bits == 1)
+        constraint = _sym_build_bool(constraint);
+
+    *out << (taken ? "yes " : "no  ") << site_id << std::endl;
+    *out << *constraint << std::endl;
 }
 
 Expr * _sym_concat_helper(Expr * a, Expr * b) {

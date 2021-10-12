@@ -1,9 +1,16 @@
-extern char __VERIFIER_nondet_char(void);
+
+_Bool __VERIFIER_nondet_bool() {
+    char x = 0;
+    read_symbolized(0, &x, sizeof(x));
+    _Bool y = x >=0;
+    printf("  <input type=\"bool\">%d</input>\n", y);
+    return y;
+}
 
 int main() {
-    char x = __VERIFIER_nondet_char();
+    _Bool x = __VERIFIER_nondet_bool();
 
-    if(x > 0) {
+    if(x) {
         return 0;
     } else {
         return 1;

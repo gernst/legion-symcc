@@ -4,7 +4,7 @@
 
   <require cpuModel="Intel Xeon E3-1230 v5 @ 3.40 GHz" cpuCores="1" />
 
-  <option name="-D" />
+  <option name="-L">ubuntu2004/lib</option>
 
   <resultfiles>**.xml</resultfiles>
 
