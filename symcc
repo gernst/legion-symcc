@@ -16,8 +16,8 @@
 
 runtime_64bit_dir="lib"
 runtime_32bit_dir="lib32"
-pass="./libSymbolize.so"
-compiler="/usr/bin/clang"
+pass="lib/libSymbolize.so"
+compiler="clang"
 
 # Find out if we're cross-compiling for a 32-bit architecture
 runtime_dir="$runtime_64bit_dir"

@@ -4,6 +4,8 @@
 
   <require cpuModel="Intel Xeon E3-1230 v5 @ 3.40 GHz" cpuCores="1" />
 
+  <option name="-D" />
+
   <resultfiles>**.xml</resultfiles>
 
   <!-- <rundefinition name="test-comp19_prop-coverage-error-call">
