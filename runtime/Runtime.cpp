@@ -145,10 +145,8 @@ void _sym_initialize(void) {
     initLibcWrappers();
 
     if (!g_config.logFile.empty()) {
-        std::cout << "using output: " << g_config.logFile << std::endl;
         out = new std::ofstream(g_config.logFile);
     } else {
-        std::cout << "using standard output" << std::endl;
         out = &std::cout;
     }
 
@@ -286,7 +284,7 @@ Expr * _sym_build_bool_to_bits(Expr * expr, uint8_t bits) {
         case 0:
             return EXPR("ite", bits, expr, one, zero);
         case 1:
-            return EXPR("ite", bits, _sym_build_not_equal(expr, &g_bit0), one, zero);
+            return EXPR("ite", bits, _sym_build_equal(expr, &g_bit0), zero, one);
         default:
             assert(expr->bits == 0 || expr->bits == 1);
             return nullptr;
