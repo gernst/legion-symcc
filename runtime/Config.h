@@ -55,6 +55,11 @@ struct Config {
   //
   // A value of 0 means no timeout. The process is terminated using alarm(2).
   size_t executionTimeout = 0;
+
+  // Maximum trace length.
+  //
+  // A value of 0 means no maximum length.
+  size_t maximumTraceLength = 0;
 };
 
 /// The global configuration object.

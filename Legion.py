@@ -256,8 +256,7 @@ class Node:
             self.is_explored = True
         elif self.is_phantom:
             assert here
-            # everything below self is truly dead code
-            self.is_explored = True
+            # self.is_explored = self.is_exhausted
         else:
             self.is_explored = self.yes.is_explored and self.no.is_explored
 
@@ -336,7 +335,7 @@ class Node:
                 print("unexpected exhausted node in select")
                 self.pp()
                 print()
-            assert not self.is_exhausted
+            # assert not self.is_exhausted
             return self
         else:
             options = []
@@ -479,14 +478,17 @@ def write_smt2_trace(ast, decls, path, identifier):
         stream.write(ast)
 
 
-def execute_with_input(binary, data, path, identifier, timeout=None):
+def execute_with_input(binary, data, path, identifier, timeout=None, maxlen=None):
     sp.run(["mkdir", "-p", path])
     path = path + "/" + str(identifier) + ".txt"
 
+    env = {}
+    env["SYMCC_LOG_FILE"] = path
+
     if timeout:
-        env = {"SYMCC_LOG_FILE": path, "SYMCC_TIMEOUT": str(timeout)}
-    else:
-        env = {"SYMCC_LOG_FILE": path}
+        env["SYMCC_TIMEOUT"] = str(timeout)
+    if maxlen:
+        env["SYMCC_MAX_TRACE_LENGTH"] = str(maxlen)
 
     process = sp.Popen(
         binary, stdin=sp.PIPE, stdout=sp.PIPE, stderr=sp.PIPE, close_fds=True, env=env
@@ -558,6 +560,7 @@ if __name__ == "__main__":
     #                     help='compile binary (requires modified symcc on path, otherwise assume it has been compiled before)')
     parser.add_argument("file", help="C source file")
     parser.add_argument("-s", "--seed", type=int, default=0, help="random seed")
+    parser.add_argument("-q", "--quiet", action="store_true", help="less output")
     parser.add_argument("-z", "--zip", action="store_true", help="zip test suite")
     parser.add_argument(
         "-64",
@@ -583,14 +586,21 @@ if __name__ == "__main__":
         "--timeout",
         type=int,
         default=1,
-        help="number of iterations (samples to generate)",
-    ),
+        help="binary execution timeout (default 1)",
+    )
+    parser.add_argument(
+        "-m",
+        "--maxlen",
+        type=int,
+        default=100,
+        help="maximum trace length (default: 100)",
+    )
     parser.add_argument(
         "-L",
         dest="library",
         default="lib",
         help="location of SymCC compiler and runtime libraries",
-    ),
+    )
     parser.add_argument(
         "-T",
         "--testcov",
@@ -619,7 +629,7 @@ if __name__ == "__main__":
     # z3_check_sparse_models()
 
     stem = os.path.basename(binary)
-    root = Node([], "", [], False)
+    root = Node([], "", [])
 
     write_metadata(source, "tests/" + stem)
 
@@ -636,6 +646,10 @@ if __name__ == "__main__":
             node = root.select()
             # node.selected += 1
 
+            if node.is_exhausted:
+                print("e", node.path.ljust(32))
+                continue
+
             prefix = node.sample()
             if prefix is None:
                 node.propagate(0, 1)
@@ -645,7 +659,7 @@ if __name__ == "__main__":
                 print("?", node.path.ljust(32), "input: " + prefix.hex())
 
             code, outs, errs, path = execute_with_input(
-                binary, prefix, "traces", "trace", args.timeout
+                binary, prefix, "traces", "trace", args.timeout, args.maxlen
             )
 
             if errs:
@@ -690,8 +704,9 @@ if __name__ == "__main__":
                 raise Exception("failed to preserve prefix (naive sampler is precise)")
         except Exception as e:
             print()
-            print("current tree")
-            root.pp_legend()
+            if not args.quiet:
+                print("current tree")
+                root.pp_legend()
             raise e
 
     print("done")
@@ -699,9 +714,10 @@ if __name__ == "__main__":
     # except:
     #     print("error")
 
-    print("final tree")
-    root.pp_legend()
-    print()
+    if not args.quiet:
+        print("final tree")
+        root.pp_legend()
+        print()
 
     if args.testcov or args.zip:
         suite = "tests/" + stem + ".zip"
@@ -719,6 +735,7 @@ if __name__ == "__main__":
             [
                 "--no-isolation",
                 "--no-plots",
+                "--timelimit-per-run", "3",
                 "--test-suite",
                 suite,
                 source,

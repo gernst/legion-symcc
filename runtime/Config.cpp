@@ -65,6 +65,10 @@ void loadConfig() {
   if (timeout != nullptr)
     g_config.executionTimeout = checkInt(timeout);
 
+  auto *length = getenv("SYMCC_MAX_TRACE_LENGTH");
+  if (length != nullptr)
+    g_config.maximumTraceLength = checkInt(length);
+
   auto *pruning = getenv("SYMCC_ENABLE_LINEARIZATION");
   if (pruning != nullptr)
     g_config.pruning = checkFlagString(pruning);

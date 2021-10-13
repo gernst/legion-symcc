@@ -98,7 +98,7 @@ The path of the node is shown on the right.
 
     final tree
         local      subtree
-    win  try     win  try    path
+       win  try     win  try    path
     *    1    1       2    2
     $    1    1       1    1    0
     $    0    0       0    0    1

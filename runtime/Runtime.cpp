@@ -35,14 +35,25 @@
 
 #define EXPR(fun, bits, ...)   new Expr(fun, bits, __VA_ARGS__, nullptr)
 
+class Extract {
+    public:
+        size_t first_bit, last_bit;
+        Extract(size_t _first_bit, size_t _last_bit)
+            : first_bit(_first_bit), last_bit(_last_bit)
+        {
+
+        }
+};
+
 class Expr {
     public:
         std::string fun;
         uint8_t bits;
         std::vector<Expr*> args;
+        Extract *extract;
 
         Expr(std::string _fun, size_t _bits, ...)
-            : fun(_fun), bits(_bits), args()
+            : fun(_fun), bits(_bits), args(), extract(nullptr)
         {
             va_list ap;
             va_start(ap, _bits);
@@ -105,6 +116,8 @@ namespace {
     Expr g_false("false", 0, nullptr);
     Expr g_zero("0", 0, nullptr);
     Expr g_bit0("#b0", 1, nullptr);
+
+    size_t traceLength;
 }
 
 void _sym_finalize(void) {
@@ -115,11 +128,13 @@ void _sym_finalize(void) {
 void _sym_abort(int code) {
     *out << std::endl; // clear any partial output
     *out << "abort" << std::endl;
+    raise(SIGKILL);
 }
 
 void _sym_timeout(int) {
     *out << std::endl; // clear any partial output
     *out << "timeout" << std::endl;
+    raise(SIGKILL);
 }
 
 void _sym_initialize(void) {
@@ -307,6 +322,11 @@ void _sym_push_path_constraint(Expr * constraint, int taken,
     if (constraint == nullptr)
         return;
 
+    traceLength++;
+    if(g_config.maximumTraceLength > 0 && traceLength > g_config.maximumTraceLength) {
+        raise(SIGALRM);
+    }
+
     if(constraint->bits == 1)
         constraint = _sym_build_bool(constraint);
 
@@ -315,17 +335,44 @@ void _sym_push_path_constraint(Expr * constraint, int taken,
 }
 
 Expr * _sym_concat_helper(Expr * a, Expr * b) {
-  return EXPR("concat", a->bits + b->bits, a, b);
+    if(a->extract && b->extract) {
+        if(a->extract->last_bit == b->extract->first_bit + 1) {
+            assert(a->args.size() == 1);
+            assert(b->args.size() == 1);
+            Expr * a0 = a->args[0];
+            Expr * b0 = b->args[0];
+            if(a0 == b0)
+                return _sym_extract_helper(a0, a->extract->first_bit, b->extract->last_bit);
+        }
+    }
+
+    return EXPR("concat", a->bits + b->bits, a, b);
 }
 
 Expr * _sym_extract_helper(Expr * expr, size_t first_bit, size_t last_bit) {
     size_t bits = first_bit - last_bit + 1;
     if(expr->bits == bits) {
         return expr;
-    } else {
-        std::string fun = "(_ extract " + decimal(first_bit) + " " + decimal(last_bit) + ")";
-        return EXPR(fun, bits, expr);
     }
+    
+    if(expr->fun == "concat") {
+        assert(expr->args.size() == 2);
+
+        Expr * e0 = expr->args[0];
+        Expr * e1 = expr->args[1];
+
+        if(last_bit >= e1->bits)
+            return _sym_extract_helper(e0, first_bit - e1->bits, last_bit - e1->bits);
+
+        if(first_bit < e1->bits)
+            return _sym_extract_helper(e1, first_bit, last_bit);
+    }
+
+    std::string fun = "(_ extract " + decimal(first_bit) + " " + decimal(last_bit) + ")";
+    auto res = EXPR(fun, bits, expr);
+    res->extract = new Extract(first_bit, last_bit);
+
+    return res;
 }
 
 size_t _sym_bits_helper(Expr * expr) {
