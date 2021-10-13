@@ -28,4 +28,4 @@ README.html: README.md
 
 docker:
 	docker build . -t gidonernst/legion-symcc
-	docker-cp.sh
+	./docker-cp.sh

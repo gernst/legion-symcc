@@ -196,23 +196,25 @@ Expr * _sym_build_true(void)         { return &g_true; }
 Expr * _sym_build_false(void)        { return &g_false; }
 Expr * _sym_build_bool(bool value)   { return value ? &g_true : &g_false; }
 
-#define ZERO1(x) 0
-#define ZERO2(x, y) 0
+#define ZERO1(fun, x) 0
+#define ZERO2(fun, x, y) 0
 
-#define ID1(x)   x
+#define ID1(fun, x)   ((x)->bits)
 
-uint8_t SAME2(uint8_t x, uint8_t y) {
-    assert(x == y);
-    return x;
+uint8_t SAME2(const char *fun, Expr *a, Expr *b) {
+    if(a->bits != b->bits)
+        std::cerr << "(" << fun << " " << *a << " " << *b << ")" << std::endl;
+    assert(a->bits == b->bits);
+    return a->bits;
 }
 
 #define UNARY(name, fun, f) \
 SymExpr _sym_build_##name(SymExpr a) \
-{ return EXPR(fun, f(a->bits), a); }
+{ return EXPR(fun, f(fun, a), a); }
 
 #define BINARY(name, fun, f) \
 SymExpr _sym_build_##name(SymExpr a, SymExpr b) \
-{ return  EXPR(fun, f(a->bits, b->bits), a, b); }
+{ return  EXPR(fun, f(fun, a, b), a, b); }
 
 BINARY(equal, "=", ZERO2)
 
@@ -300,7 +302,7 @@ Expr * _sym_build_sext(Expr * expr, uint8_t bits) {
         return expr;
     } else {
         std::string fun = "(_ sign_extend " + decimal(bits) + ")";
-        return EXPR(fun, bits, expr);
+        return EXPR(fun, bits + expr->bits, expr);
     }
 }
 
@@ -309,7 +311,7 @@ Expr * _sym_build_zext(Expr * expr, uint8_t bits) {
         return expr;
     } else {
         std::string fun = "(_ zero_extend " + decimal(bits) + ")";
-        return EXPR(fun, bits, expr);
+        return EXPR(fun, bits + expr->bits, expr);
     }
 }
 

@@ -5,6 +5,8 @@
   <require cpuModel="Intel Xeon E3-1230 v5 @ 3.40 GHz" cpuCores="1" />
 
   <option name="-L">ubuntu2004/lib</option>
+  <option name="-m">200</option>
+  <option name="-i">100</option>
 
   <resultfiles>**.xml</resultfiles>
 

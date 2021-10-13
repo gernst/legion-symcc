@@ -287,8 +287,9 @@ class Node:
                 trace, is_complete, path + bit, constraints + [phi], index + 1
             )
         elif not is_complete:
-            print("integrated partial trace")
-            base, leaf = None, self
+            # print("integrated partial trace")
+            # base, leaf = None, self.parent
+            return None, self
         else:
             self.is_leaf = True
             self.is_phantom = False
