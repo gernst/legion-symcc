@@ -374,6 +374,11 @@ class Node:
             else:
                 return node.select()
 
+    def pp_legend(self):
+        print("      local      subtree")
+        print("   win  try     win  try    path")
+        self.pp()
+
     def pp(self):
         if not self.parent:
             key = "*"
@@ -389,9 +394,9 @@ class Node:
             key = "."
 
         if key != ".":
-            a = "%2d/%2d" % (self.here.reward, self.here.selected)
-            b = "%2d/%2d" % (self.tree.reward, self.tree.selected)
-            print(key, a, b, self.path)
+            a = "%4d %4d" % (self.here.reward, self.here.selected)
+            b = "%4d %4d" % (self.tree.reward, self.tree.selected)
+            print(key, a, "  ", b, "  ", self.path)
 
         if key != "E":
             if self.no:
@@ -422,6 +427,9 @@ def write_metadata(file, path):
     sp.run(["mkdir", "-p", path])
 
     path = path + "/metadata.xml"
+    print(path)
+    print()
+
     with open(path, "wt") as stream:
         stream.write('<?xml version="1.0" encoding="UTF-8" standalone="no"?>\n')
         stream.write(
@@ -532,26 +540,12 @@ def compile_symcc(libs, source, binary):
     cmd.append("-Wl,-rpath," + rpath)
     
     run(*cmd)
+    print()
 
 
 def zip_files(file, paths):
-    sp.run(["zip", "-r", file, *paths])
-
-
-def z3_check_sparse_models():
-    solver = z3.Optimize()
-    x = z3.BitVec("x", 8)
-    y = z3.BitVec("y", 8)
-    solver.add(x > 0)
-    solver.add(y == y)
-    assert solver.check() == z3.sat
-    model = solver.model()
-    names = [v.name() for v in model]
-    assert "x" in names
-    assert "y" not in names
-    assert names == ["x"]
-    del solver
-
+    run("zip", "-r", file, *paths)
+    print()
 
 if __name__ == "__main__":
     if len(sys.argv) == 2 and (sys.argv[1] == "-v" or sys.argv[1] == "--version"):
@@ -645,7 +639,7 @@ if __name__ == "__main__":
             prefix = node.sample()
             if prefix is None:
                 node.propagate(0, 1)
-                print("E", node.path.ljust(32))
+                print("e", node.path.ljust(32))
                 continue
             else:
                 print("?", node.path.ljust(32), "input: " + prefix.hex())
@@ -695,8 +689,9 @@ if __name__ == "__main__":
                 print("!", leaf.path)  # missed a prefix
                 raise Exception("failed to preserve prefix (naive sampler is precise)")
         except Exception as e:
+            print()
             print("current tree")
-            root.pp()
+            root.pp_legend()
             raise e
 
     print("done")
@@ -704,7 +699,8 @@ if __name__ == "__main__":
     # except:
     #     print("error")
 
-    root.pp()
+    print("final tree")
+    root.pp_legend()
     print()
 
     if args.testcov or args.zip:

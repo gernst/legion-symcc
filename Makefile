@@ -23,6 +23,9 @@ lib:
 lib32:
 	mkdir -p lib32
 
+README.html: README.md
+	pandoc $< -s -o $@
+
 docker:
 	docker build . -t gidonernst/legion-symcc
 	docker-cp.sh
