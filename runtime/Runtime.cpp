@@ -153,7 +153,7 @@ void _sym_initialize(void) {
     if(g_config.executionTimeout > 0) {
         signal(SIGALRM, _sym_timeout);
         signal(SIGABRT, _sym_abort);
-        signal(SIGSEGV, _sym_abort);
+        signal(SIGSEGV, _sym_abort); // may be a leaf, we do not know!
         alarm(g_config.executionTimeout);
     }
 
@@ -336,7 +336,7 @@ void _sym_push_path_constraint(Expr * constraint, int taken,
 }
 
 Expr * _sym_concat_helper(Expr * a, Expr * b) {
-    if(a->extract && b->extract) {
+    if(false && a->extract && b->extract) {
         if(a->extract->last_bit == b->extract->first_bit + 1) {
             assert(a->args.size() == 1);
             assert(b->args.size() == 1);
@@ -352,11 +352,11 @@ Expr * _sym_concat_helper(Expr * a, Expr * b) {
 
 Expr * _sym_extract_helper(Expr * expr, size_t first_bit, size_t last_bit) {
     size_t bits = first_bit - last_bit + 1;
-    if(expr->bits == bits) {
+    if(false && expr->bits == bits) {
         return expr;
     }
     
-    if(expr->fun == "concat") {
+    if(false && expr->fun == "concat") {
         assert(expr->args.size() == 2);
 
         Expr * e0 = expr->args[0];

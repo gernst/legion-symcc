@@ -458,7 +458,7 @@ void Symbolizer::visitLoadInst(LoadInst &I) {
   IRBuilder<> IRB(&I);
 
   auto *addr = I.getPointerOperand();
-  tryAlternative(IRB, addr);
+  // tryAlternative(IRB, addr);
 
   auto *dataType = I.getType();
   auto *data = IRB.CreateCall(
@@ -478,7 +478,7 @@ void Symbolizer::visitLoadInst(LoadInst &I) {
 void Symbolizer::visitStoreInst(StoreInst &I) {
   IRBuilder<> IRB(&I);
 
-  tryAlternative(IRB, I.getPointerOperand());
+  // tryAlternative(IRB, I.getPointerOperand());
 
   auto *data = getSymbolicExpressionOrNull(I.getValueOperand());
   auto *dataType = I.getValueOperand()->getType();

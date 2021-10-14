@@ -14,6 +14,7 @@ from math import sqrt, log, ceil, inf
 
 RHO = 1
 INPUTS = set()
+KNOWN  = set()
 VERSION = "testcomp2022"
 BITS = 64
 
@@ -142,19 +143,23 @@ def naive(solver, target):
         solver.push()
         solver.add(result ^ delta == guess)
 
-        for known in INPUTS:
-            solver.add(result != known)
+        for known in KNOWN:
+            if result.size() == known.size():
+                solver.add(result != known)
 
         if solver.check() != z3.sat:
             break
 
         model = solver.model()
-        value = model[result].as_long()
+        value = model[result]
+
+        sample = int_to_bytes(value.as_long(), n//8)
 
         solver.pop()
 
-        INPUTS.add(value)
-        yield value
+        KNOWN.add(value)
+        INPUTS.add(sample)
+        yield sample
 
 
 class Arm:
@@ -319,11 +324,13 @@ class Node:
 
         try:
             sample = next(self.sampler)
-            inputs = int_to_bytes(sample, self.nbytes)
-            return inputs
+            return sample
 
         except StopIteration:
             # print("exhaust via sampler", self.path)
+            # print("target     ", self.target)
+            # print("constraints", self.constraints)
+            # print("inputs     ", [i.hex() for i in INPUTS])
             self.exhaust()
             return None
 
@@ -333,7 +340,7 @@ class Node:
 
         if self.is_phantom:
             if self.is_exhausted:
-                print("unexpected exhausted node in select")
+                # print("unexpected exhausted node in select")
                 self.pp()
                 print()
             # assert not self.is_exhausted
@@ -482,7 +489,7 @@ def write_smt2_trace(ast, decls, path, identifier):
 def execute_with_input(binary, data, path, identifier, timeout=None, maxlen=None):
     sp.run(["mkdir", "-p", path])
     path = path + "/" + str(identifier) + ".txt"
-    os.remove(path)
+    # os.remove(path)
 
     env = {}
     env["SYMCC_LOG_FILE"] = path
@@ -663,12 +670,9 @@ if __name__ == "__main__":
                 continue
             else:
                 print("?", node.path.ljust(32), "input: " + prefix.hex())
-                if args.verbose:
-                    print("  target     ",  node.target)
-                    print("  constraints", node.constraints)
 
             code, outs, errs, path = execute_with_input(
-                binary, prefix, "traces", "trace", args.timeout, args.maxlen
+                binary, prefix, "traces", str(i), args.timeout, args.maxlen
             )
 
             if errs:
@@ -714,6 +718,7 @@ if __name__ == "__main__":
                 print("!", leaf.path)  # missed a prefix
                 # for a precise sampler, this means that we have a bogus node here
                 # that should be regarded as an unreachable leaf
+                # print("exhaust missed path", node.path)
                 node.is_leaf = True
                 node.is_phantom = False
                 node.exhaust()
