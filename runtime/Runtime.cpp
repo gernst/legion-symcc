@@ -120,37 +120,42 @@ namespace {
     size_t traceLength;
 }
 
+void hard_shutdown() {
+    fflush(stdout);
+    close(0);
+    close(1);
+    close(2);
+    raise(SIGKILL);
+}
+
 void _sym_finalize(void) {
     *out << std::endl; // clear any partial output
     *out << "exit" << std::endl;
+    hard_shutdown();
 }
 
 void _sym_abort(int code) {
     *out << std::endl; // clear any partial output
     *out << "abort" << std::endl;
-    fflush(stdout);
-    raise(SIGKILL);
+    hard_shutdown();
 }
 
 void _sym_segfault(int code) {
     *out << std::endl; // clear any partial output
     *out << "segfault" << std::endl;
-    fflush(stdout);
-    raise(SIGKILL);
+    hard_shutdown();
 }
 
 void _sym_timeout(int) {
     *out << std::endl; // clear any partial output
     *out << "timeout" << std::endl;
-    fflush(stdout);
-    raise(SIGKILL);
+    hard_shutdown();
 }
 
 void _sym_unsupported() {
     *out << std::endl; // clear any partial output
     *out << "unsupported" << std::endl;
-    fflush(stdout);
-    raise(SIGKILL);
+    hard_shutdown();
 }
 
 void _sym_initialize(void) {

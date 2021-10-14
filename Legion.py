@@ -9,6 +9,7 @@ import random
 import subprocess as sp
 import sys
 import z3
+import threading
 
 from math import sqrt, log, ceil, inf
 
@@ -506,6 +507,7 @@ def execute_with_input(binary, data, path, identifier, timeout=None, maxlen=None
 
     if timeout:
         env["SYMCC_TIMEOUT"] = str(timeout)
+        timeout += 1 # let the process have 1s of graceful shutdown
     if maxlen:
         env["SYMCC_MAX_TRACE_LENGTH"] = str(maxlen)
 
@@ -516,12 +518,17 @@ def execute_with_input(binary, data, path, identifier, timeout=None, maxlen=None
     # write initial input
     process.stdin.write(data)
 
-    # provide random input as further necessary
-    while process.poll() is None:
-        try:
-            process.stdin.write(random_bytes(64))
-        except BrokenPipeError:
-            break
+    timer = threading.Timer(timeout, process.kill)
+    try:
+        timer.start()
+        # provide random input as further necessary
+        while process.poll() is None:
+            try:
+                process.stdin.write(random_bytes(64))
+            except BrokenPipeError:
+                break
+    finally:
+        timer.cancel()
 
     process.wait()
 
@@ -558,6 +565,7 @@ def compile_symcc(libs, source, binary):
     ])
 
     cmd.append("-lstdc++")
+    cmd.append("-lm")
     cmd.append("-lSymRuntime")
     cmd.append("-L" + rpath)
     cmd.append("-Wl,-rpath," + rpath)

@@ -29,3 +29,7 @@ README.html: README.md
 docker:
 	docker build . -t gidonernst/legion-symcc
 	./docker-cp.sh
+
+archive:
+	cp -r legion.sh Legion.py __VERIFIER.c ubuntu2004 dist ../testcomp-archives-2022/2022/legion-symcc
+	(cd ../testcomp-archives-2022/2022/; zip legion-symcc.zip legion-symcc/ -r)

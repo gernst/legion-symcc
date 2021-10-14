@@ -30,9 +30,9 @@
     <includesfile>../sv-benchmarks/c/ReachSafety-ECA.set</includesfile>
     <excludesfile>excludes/ReachSafety-ECA-excludes.set</excludesfile>
   </tasks>
-  <tasks name="ReachSafety-Floats">
+  <!-- <tasks name="ReachSafety-Floats">
     <includesfile>../sv-benchmarks/c/ReachSafety-Floats.set</includesfile>
-  </tasks>
+  </tasks> -->
   <tasks name="ReachSafety-Heap">
     <includesfile>../sv-benchmarks/c/ReachSafety-Heap.set</includesfile>
   </tasks>
@@ -55,9 +55,9 @@
     <includesfile>../sv-benchmarks/c/ReachSafety-Combinations.set</includesfile>
   </tasks>
 
-  <tasks name="ConcurrencySafety-Main">
+  <!-- <tasks name="ConcurrencySafety-Main">
     <includesfile>../sv-benchmarks/c/ConcurrencySafety-Main.set</includesfile>
-  </tasks>
+  </tasks> -->
 
   <tasks name="SoftwareSystems-BusyBox-MemSafety">
     <includesfile>../sv-benchmarks/c/SoftwareSystems-BusyBox-MemSafety.set</includesfile>
