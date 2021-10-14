@@ -96,6 +96,16 @@ def trace_from_file(trace):
                 last = line
                 ok = False
 
+            elif line.startswith("segfault"):
+                flush()
+                last = line
+                ok = False
+
+            elif line.startswith("unsupported"):
+                flush()
+                last = line
+                ok = False
+
             elif line.startswith("timeout"):
                 flush()
                 last = line
@@ -672,15 +682,15 @@ if __name__ == "__main__":
                 print("?", node.path.ljust(32), "input: " + prefix.hex())
 
             code, outs, errs, path = execute_with_input(
-                binary, prefix, "traces", str(i), args.timeout, args.maxlen
+                binary, prefix, "traces/" + stem, i, args.timeout, args.maxlen
             )
 
             if errs:
                 print("stderr:")
                 for line in errs:
                     print(line.decode("utf-8"))
-            if code != 0:
-                print("code: ", code)
+            # if code != 0:
+            #    print("code: ", code)
 
             try:
                 ok, last, trace = trace_from_file(path)
@@ -719,9 +729,10 @@ if __name__ == "__main__":
                 # for a precise sampler, this means that we have a bogus node here
                 # that should be regarded as an unreachable leaf
                 # print("exhaust missed path", node.path)
-                node.is_leaf = True
-                node.is_phantom = False
-                node.exhaust()
+                # node.pp()
+                # node.is_leaf = True
+                # node.is_phantom = False
+                # node.exhaust()
                 # raise Exception("failed to preserve prefix (naive sampler is precise)")
         except Exception as e:
             print()

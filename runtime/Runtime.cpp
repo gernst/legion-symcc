@@ -128,12 +128,28 @@ void _sym_finalize(void) {
 void _sym_abort(int code) {
     *out << std::endl; // clear any partial output
     *out << "abort" << std::endl;
+    fflush(stdout);
+    raise(SIGKILL);
+}
+
+void _sym_segfault(int code) {
+    *out << std::endl; // clear any partial output
+    *out << "segfault" << std::endl;
+    fflush(stdout);
     raise(SIGKILL);
 }
 
 void _sym_timeout(int) {
     *out << std::endl; // clear any partial output
     *out << "timeout" << std::endl;
+    fflush(stdout);
+    raise(SIGKILL);
+}
+
+void _sym_unsupported() {
+    *out << std::endl; // clear any partial output
+    *out << "unsupported" << std::endl;
+    fflush(stdout);
     raise(SIGKILL);
 }
 
@@ -153,7 +169,7 @@ void _sym_initialize(void) {
     if(g_config.executionTimeout > 0) {
         signal(SIGALRM, _sym_timeout);
         signal(SIGABRT, _sym_abort);
-        signal(SIGSEGV, _sym_abort); // may be a leaf, we do not know!
+        signal(SIGSEGV, _sym_segfault); // may be a leaf, we do not know!
         alarm(g_config.executionTimeout);
     }
 
@@ -171,7 +187,7 @@ Expr * _sym_build_integer128(uint64_t high, uint64_t low) {
 }
 
 Expr * _sym_build_float(double value, int is_double) {
-    abort();
+    _sym_unsupported();
     return nullptr;
 }
 
@@ -256,27 +272,27 @@ BINARY(float_ordered_less_than, "fpa_lt", ZERO2)
 BINARY(float_ordered_less_equal, "fpa_leq", ZERO2)
 BINARY(float_ordered_equal, "fpa_eq", ZERO2)
 
-Expr * _sym_build_fp_abs(Expr * a) { abort(); return nullptr; }
-Expr * _sym_build_fp_add(Expr * a, Expr * b) { abort(); return nullptr; }
-Expr * _sym_build_fp_sub(Expr * a, Expr * b) { abort(); return nullptr; }
-Expr * _sym_build_fp_mul(Expr * a, Expr * b) { abort(); return nullptr; }
-Expr * _sym_build_fp_div(Expr * a, Expr * b) { abort(); return nullptr; }
-Expr * _sym_build_fp_rem(Expr * a, Expr * b) { abort(); return nullptr; }
-Expr * _sym_build_float_ordered_not_equal(Expr * a, Expr * b) { abort(); return nullptr; }
-Expr * _sym_build_float_ordered(Expr * a, Expr * b) { abort(); return nullptr; }
-Expr * _sym_build_float_unordered(Expr * a, Expr * b) { abort(); return nullptr; }
-Expr * _sym_build_float_unordered_greater_than(Expr * a, Expr * b) { abort(); return nullptr; }
-Expr * _sym_build_float_unordered_greater_equal(Expr * a, Expr * b) { abort(); return nullptr; }
-Expr * _sym_build_float_unordered_less_than(Expr * a, Expr * b) { abort(); return nullptr; }
-Expr * _sym_build_float_unordered_less_equal(Expr * a, Expr * b) { abort(); return nullptr; }
-Expr * _sym_build_float_unordered_equal(Expr * a, Expr * b) { abort(); return nullptr; }
-Expr * _sym_build_float_unordered_not_equal(Expr * a, Expr * b) { abort(); return nullptr; }
-Expr * _sym_build_int_to_float(Expr * value, int is_double, int is_signed) { abort(); return nullptr; }
-Expr * _sym_build_float_to_float(Expr * expr, int to_double) { abort(); return nullptr; }
-Expr * _sym_build_bits_to_float(Expr * expr, int to_double) { abort(); return nullptr; }
-Expr * _sym_build_float_to_bits(Expr * expr) { abort(); return nullptr; }
-Expr * _sym_build_float_to_signed_integer(Expr * expr, uint8_t bits) { abort(); return nullptr; }
-Expr * _sym_build_float_to_unsigned_integer(Expr * expr, uint8_t bits) { abort(); return nullptr; }
+Expr * _sym_build_fp_abs(Expr * a) { _sym_unsupported(); return nullptr; }
+Expr * _sym_build_fp_add(Expr * a, Expr * b) { _sym_unsupported(); return nullptr; }
+Expr * _sym_build_fp_sub(Expr * a, Expr * b) { _sym_unsupported(); return nullptr; }
+Expr * _sym_build_fp_mul(Expr * a, Expr * b) { _sym_unsupported(); return nullptr; }
+Expr * _sym_build_fp_div(Expr * a, Expr * b) { _sym_unsupported(); return nullptr; }
+Expr * _sym_build_fp_rem(Expr * a, Expr * b) { _sym_unsupported(); return nullptr; }
+Expr * _sym_build_float_ordered_not_equal(Expr * a, Expr * b) { _sym_unsupported(); return nullptr; }
+Expr * _sym_build_float_ordered(Expr * a, Expr * b) { _sym_unsupported(); return nullptr; }
+Expr * _sym_build_float_unordered(Expr * a, Expr * b) { _sym_unsupported(); return nullptr; }
+Expr * _sym_build_float_unordered_greater_than(Expr * a, Expr * b) { _sym_unsupported(); return nullptr; }
+Expr * _sym_build_float_unordered_greater_equal(Expr * a, Expr * b) { _sym_unsupported(); return nullptr; }
+Expr * _sym_build_float_unordered_less_than(Expr * a, Expr * b) { _sym_unsupported(); return nullptr; }
+Expr * _sym_build_float_unordered_less_equal(Expr * a, Expr * b) { _sym_unsupported(); return nullptr; }
+Expr * _sym_build_float_unordered_equal(Expr * a, Expr * b) { _sym_unsupported(); return nullptr; }
+Expr * _sym_build_float_unordered_not_equal(Expr * a, Expr * b) { _sym_unsupported(); return nullptr; }
+Expr * _sym_build_int_to_float(Expr * value, int is_double, int is_signed) { _sym_unsupported(); return nullptr; }
+Expr * _sym_build_float_to_float(Expr * expr, int to_double) { _sym_unsupported(); return nullptr; }
+Expr * _sym_build_bits_to_float(Expr * expr, int to_double) { _sym_unsupported(); return nullptr; }
+Expr * _sym_build_float_to_bits(Expr * expr) { _sym_unsupported(); return nullptr; }
+Expr * _sym_build_float_to_signed_integer(Expr * expr, uint8_t bits) { _sym_unsupported(); return nullptr; }
+Expr * _sym_build_float_to_unsigned_integer(Expr * expr, uint8_t bits) { _sym_unsupported(); return nullptr; }
 
 Expr * _sym_build_bool_to_bits(Expr * expr, uint8_t bits) {
     Expr * one = _sym_build_integer(1, bits);
@@ -336,7 +352,7 @@ void _sym_push_path_constraint(Expr * constraint, int taken,
 }
 
 Expr * _sym_concat_helper(Expr * a, Expr * b) {
-    if(false && a->extract && b->extract) {
+    if(a->extract && b->extract) {
         if(a->extract->last_bit == b->extract->first_bit + 1) {
             assert(a->args.size() == 1);
             assert(b->args.size() == 1);
@@ -352,11 +368,11 @@ Expr * _sym_concat_helper(Expr * a, Expr * b) {
 
 Expr * _sym_extract_helper(Expr * expr, size_t first_bit, size_t last_bit) {
     size_t bits = first_bit - last_bit + 1;
-    if(false && expr->bits == bits) {
+    if(expr->bits == bits) {
         return expr;
     }
     
-    if(false && expr->fun == "concat") {
+    if(expr->fun == "concat") {
         assert(expr->args.size() == 2);
 
         Expr * e0 = expr->args[0];

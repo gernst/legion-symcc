@@ -4,6 +4,11 @@
 
 extern ssize_t read_symbolized(int fd, void *buf, size_t count);
 
+void __assert_fail (const char *__assertion, const char *__file,
+      unsigned int __line, const char *__function) {
+    exit(1);
+}
+
 _Bool __VERIFIER_nondet_bool() {
     char x = 0;
     read_symbolized(0, &x, sizeof(x));

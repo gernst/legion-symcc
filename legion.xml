@@ -5,8 +5,8 @@
   <require cpuModel="Intel Xeon E3-1230 v5 @ 3.40 GHz" cpuCores="1" />
 
   <option name="-L">ubuntu2004/lib</option>
-  <option name="-m">200</option>
-  <option name="-i">200</option>
+  <option name="-m">100</option>
+  <option name="-i">10</option>
 
   <resultfiles>**.xml</resultfiles>
 
@@ -17,61 +17,65 @@
   <rundefinition name="test-comp19_prop-coverage-branches">
     <propertyfile>../sv-benchmarks/c/properties/coverage-branches.prp</propertyfile>
   </rundefinition>
-
   <tasks name="ReachSafety-Arrays">
     <includesfile>../sv-benchmarks/c/ReachSafety-Arrays.set</includesfile>
-    <option name="-32"/>
   </tasks>
   <tasks name="ReachSafety-BitVectors">
     <includesfile>../sv-benchmarks/c/ReachSafety-BitVectors.set</includesfile>
-    <option name="-32"/>
   </tasks>
   <tasks name="ReachSafety-ControlFlow">
     <includesfile>../sv-benchmarks/c/ReachSafety-ControlFlow.set</includesfile>
-    <option name="-32"/>
   </tasks>
   <tasks name="ReachSafety-ECA">
     <includesfile>../sv-benchmarks/c/ReachSafety-ECA.set</includesfile>
-    <option name="-32"/>
+    <excludesfile>excludes/ReachSafety-ECA-excludes.set</excludesfile>
   </tasks>
   <tasks name="ReachSafety-Floats">
     <includesfile>../sv-benchmarks/c/ReachSafety-Floats.set</includesfile>
-    <option name="-32"/>
   </tasks>
   <tasks name="ReachSafety-Heap">
     <includesfile>../sv-benchmarks/c/ReachSafety-Heap.set</includesfile>
-    <option name="-32"/>
   </tasks>
   <tasks name="ReachSafety-Loops">
     <includesfile>../sv-benchmarks/c/ReachSafety-Loops.set</includesfile>
-    <option name="-32"/>
+  </tasks>
+  <tasks name="ReachSafety-ProductLines">
+    <includesfile>../sv-benchmarks/c/ReachSafety-ProductLines.set</includesfile>
   </tasks>
   <tasks name="ReachSafety-Recursive">
     <includesfile>../sv-benchmarks/c/ReachSafety-Recursive.set</includesfile>
-    <option name="-32"/>
   </tasks>
   <tasks name="ReachSafety-Sequentialized">
     <includesfile>../sv-benchmarks/c/ReachSafety-Sequentialized.set</includesfile>
-    <option name="-32"/>
+  </tasks>
+  <tasks name="ReachSafety-XCSP">
+    <includesfile>../sv-benchmarks/c/ReachSafety-XCSP.set</includesfile>
+  </tasks>
+  <tasks name="ReachSafety-Combinations">
+    <includesfile>../sv-benchmarks/c/ReachSafety-Combinations.set</includesfile>
+  </tasks>
+
+  <tasks name="ConcurrencySafety-Main">
+    <includesfile>../sv-benchmarks/c/ConcurrencySafety-Main.set</includesfile>
   </tasks>
 
   <tasks name="SoftwareSystems-BusyBox-MemSafety">
     <includesfile>../sv-benchmarks/c/SoftwareSystems-BusyBox-MemSafety.set</includesfile>
-    <option name="-64"/>
-  </tasks>
-  <tasks name="SoftwareSystems-DeviceDriversLinux64-ReachSafety">
-    <includesfile>../sv-benchmarks/c/SoftwareSystems-DeviceDriversLinux64-ReachSafety.set</includesfile>
-    <option name="-64"/>
-  </tasks>
-  <tasks name="SoftwareSystems-SQLite-MemSafety">
-    <includesfile>../sv-benchmarks/c/SoftwareSystems-SQLite-MemSafety.set</includesfile>
-    <option name="-64"/>
-  </tasks>
-  <tasks name="Termination-MainHeap">
-    <includesfile>../sv-benchmarks/c/Termination-MainHeap.set</includesfile>
-    <option name="-64"/>
   </tasks>
 
+  <tasks name="SoftwareSystems-DeviceDriversLinux64-ReachSafety">
+    <includesfile>../sv-benchmarks/c/SoftwareSystems-DeviceDriversLinux64-ReachSafety.set</includesfile>
+    <excludesfile>../sv-benchmarks/c/SoftwareSystems-DeviceDriversLinux64Large-ReachSafety.set</excludesfile>
+  </tasks>
+
+  <tasks name="SoftwareSystems-SQLite-MemSafety">
+    <includesfile>../sv-benchmarks/c/SoftwareSystems-SQLite-MemSafety.set</includesfile>
+  </tasks>
+
+  <tasks name="Termination-MainHeap">
+    <includesfile>../sv-benchmarks/c/Termination-MainHeap.set</includesfile>
+  </tasks>
+  
   <columns>
     <column title="branches_covered">Coverage: </column>
     <column title="branches_total">Number of goals: </column>
