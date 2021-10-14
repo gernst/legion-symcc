@@ -393,7 +393,7 @@ class Node:
         else:
             key = "."
 
-        if key != ".":
+        if True or key != ".":
             a = "%4d %4d" % (self.here.reward, self.here.selected)
             b = "%4d %4d" % (self.tree.reward, self.tree.selected)
             print(key, a, "  ", b, "  ", self.path)
@@ -482,6 +482,7 @@ def write_smt2_trace(ast, decls, path, identifier):
 def execute_with_input(binary, data, path, identifier, timeout=None, maxlen=None):
     sp.run(["mkdir", "-p", path])
     path = path + "/" + str(identifier) + ".txt"
+    os.remove(path)
 
     env = {}
     env["SYMCC_LOG_FILE"] = path
@@ -504,6 +505,8 @@ def execute_with_input(binary, data, path, identifier, timeout=None, maxlen=None
             process.stdin.write(random_bytes(64))
         except BrokenPipeError:
             break
+
+    process.wait()
 
     # force reading entire output
     code = process.returncode
@@ -562,6 +565,7 @@ if __name__ == "__main__":
     parser.add_argument("file", help="C source file")
     parser.add_argument("-s", "--seed", type=int, default=0, help="random seed")
     parser.add_argument("-q", "--quiet", action="store_true", help="less output")
+    parser.add_argument("-V", "--verbose", action="store_true", help="more output")
     parser.add_argument("-z", "--zip", action="store_true", help="zip test suite")
     parser.add_argument(
         "-64",
@@ -652,12 +656,16 @@ if __name__ == "__main__":
                 continue
 
             prefix = node.sample()
+
             if prefix is None:
                 node.propagate(0, 1)
                 print("e", node.path.ljust(32))
                 continue
             else:
                 print("?", node.path.ljust(32), "input: " + prefix.hex())
+                if args.verbose:
+                    print("  target     ",  node.target)
+                    print("  constraints", node.constraints)
 
             code, outs, errs, path = execute_with_input(
                 binary, prefix, "traces", "trace", args.timeout, args.maxlen
@@ -667,6 +675,8 @@ if __name__ == "__main__":
                 print("stderr:")
                 for line in errs:
                     print(line.decode("utf-8"))
+            if code != 0:
+                print("code: ", code)
 
             try:
                 ok, last, trace = trace_from_file(path)
@@ -702,7 +712,12 @@ if __name__ == "__main__":
                 print("+", leaf.path)
             elif not leaf.path.startswith(node.path):
                 print("!", leaf.path)  # missed a prefix
-                raise Exception("failed to preserve prefix (naive sampler is precise)")
+                # for a precise sampler, this means that we have a bogus node here
+                # that should be regarded as an unreachable leaf
+                node.is_leaf = True
+                node.is_phantom = False
+                node.exhaust()
+                # raise Exception("failed to preserve prefix (naive sampler is precise)")
         except Exception as e:
             print()
             if not args.quiet:

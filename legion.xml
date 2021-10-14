@@ -6,7 +6,7 @@
 
   <option name="-L">ubuntu2004/lib</option>
   <option name="-m">200</option>
-  <option name="-i">100</option>
+  <option name="-i">200</option>
 
   <resultfiles>**.xml</resultfiles>
 

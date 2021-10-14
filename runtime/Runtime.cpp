@@ -153,6 +153,7 @@ void _sym_initialize(void) {
     if(g_config.executionTimeout > 0) {
         signal(SIGALRM, _sym_timeout);
         signal(SIGABRT, _sym_abort);
+        signal(SIGSEGV, _sym_abort);
         alarm(g_config.executionTimeout);
     }
 
