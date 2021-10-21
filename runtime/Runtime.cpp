@@ -219,7 +219,7 @@ Expr * _sym_build_bool(bool value)   { return value ? &g_true : &g_false; }
 #define ZERO1(fun, x) 0
 #define ZERO2(fun, x, y) 0
 
-#define ID1(fun, x)   ((x)->bits)
+#define SAME1(fun, x)   ((x)->bits)
 
 uint8_t SAME2(const char *fun, Expr *a, Expr *b) {
     if(a->bits != b->bits)
@@ -243,8 +243,8 @@ BINARY(bool_and, "and", ZERO2)
 BINARY(bool_or, "or", ZERO2)
 BINARY(bool_xor, "xor", ZERO2)
 
-UNARY(neg, "bvneg", ID1)
-UNARY(not, "bvnot", ID1)
+UNARY(neg, "bvneg", SAME1)
+UNARY(not, "bvnot", SAME1)
 
 BINARY(add, "bvadd", SAME2)
 BINARY(sub, "bvsub", SAME2)
@@ -277,7 +277,9 @@ BINARY(float_ordered_less_than, "fpa_lt", ZERO2)
 BINARY(float_ordered_less_equal, "fpa_leq", ZERO2)
 BINARY(float_ordered_equal, "fpa_eq", ZERO2)
 
-Expr * _sym_build_fp_abs(Expr * a) { _sym_unsupported(); return nullptr; }
+UNARY(fp_abs, "fp.abs", SAME1)
+
+// Expr * _sym_build_fp_abs(Expr * a) { _sym_unsupported(); return nullptr; }
 Expr * _sym_build_fp_add(Expr * a, Expr * b) { _sym_unsupported(); return nullptr; }
 Expr * _sym_build_fp_sub(Expr * a, Expr * b) { _sym_unsupported(); return nullptr; }
 Expr * _sym_build_fp_mul(Expr * a, Expr * b) { _sym_unsupported(); return nullptr; }
