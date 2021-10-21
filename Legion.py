@@ -197,6 +197,25 @@ class Arm:
     def descr(self, N):
         return "uct(%d, %d, %d)" % (self.reward, self.selected, N)
 
+class Insert:
+    def __init__(self, node, trace, is_complete, index):
+        self.node = node
+        self.trace = trace
+        self.is_complete = is_complete
+        self.index = index
+
+        self.is_explored = False
+        self.tree = node.tree
+
+    def force(self):
+        self.node.insert(self.trace, self.is_complete, self.index)
+        return self.node
+
+    def pp(self):
+        print("i")
+
+    def check_invariants(self):
+        pass
 
 class Node:
     def __init__(self, target, path, pos, neg, parent=None):
@@ -305,11 +324,11 @@ class Node:
                 node.site = site
                 # node.yes = Node(target, node.path + "1", node.constraints + [yes], parent=node)
                 # node.no = Node(target, node.path + "0", node.constraints + [no], parent=node)
-                node.yes = Node(target, self.path + "1", node.pos + [phi], node.neg, parent=node)
-                node.no = Node(target, self.path + "0", node.pos, node.neg + [phi], parent=node)
+                node.yes = Node(target, node.path + "1", node.pos + [phi], node.neg, parent=node)
+                node.no = Node(target, node.path + "0", node.pos, node.neg + [phi], parent=node)
 
                 if is_complete and not base:
-                    base = Node
+                    base = node
 
             node = node.yes if polarity else node.no
 
@@ -328,36 +347,48 @@ class Node:
 
             site, target, polarity, phi = trace[index]
 
-            yes = phi
-            no = z3.Not(phi)
-            phi = yes if polarity else no
-
             if was_phantom:
                 self.is_phantom = False
                 self.site = site
-                raise None
-                #self.yes = Node(target, self.path + "1", self.constraints + [yes], parent=self)
-                #self.no = Node(target, self.path + "0", self.constraints + [no], parent=self)
+                
+                yes = Node(target, self.path + "1", self.pos + [phi], self.neg, parent=self)
+                no = Node(target, self.path + "0", self.pos, self.neg + [phi], parent=self)
 
-            child = self.yes if polarity else self.no
-            base, leaf = child._insert(
-                trace, is_complete, index + 1
-            )
+                # delay inserting this trace
+                if polarity:
+                    self.yes = Insert(yes, trace, is_complete, index + 1)
+                    self.no = no
+                    return self, yes
+                else:
+                    self.yes = yes
+                    self.no = Insert(no, trace, is_complete, index + 1)
+                    return self, no
+
+            else:
+                if polarity:
+                    if hasattr(self.yes, "force"):
+                        self.yes = self.yes.force()
+                    return self.yes.insert(trace, is_complete, index + 1)
+                else:
+                    if hasattr(self.no, "force"):
+                        self.no = self.no.force()
+                    return self.no.insert(trace, is_complete, index + 1)
+
         elif not is_complete:
             # print("integrated partial trace")
             # base, leaf = None, self.parent
             return None, self
+
         else:
             self.is_leaf = True
             self.is_phantom = False
             # print("exhaust leaf at", self.path)
             self.exhaust()
-            base, leaf = None, self
 
-        if was_phantom:
-            return self, leaf
-        else:
-            return base, leaf
+            if was_phantom:
+                return self, self
+            else:
+                return None, self
 
     def sample(self):
         assert not self.is_exhausted
@@ -727,12 +758,16 @@ if __name__ == "__main__":
 
         try:
             # root.pp()
+            if args.verbose:
+                print("checking invariants")
             root.check_invariants()
 
             if root.is_explored:
                 print("explored")
                 break
 
+            if args.verbose:
+                print("selecting")
             node = root.select()
             # node.selected += 1
 
@@ -740,6 +775,8 @@ if __name__ == "__main__":
                 print("e", node.path.ljust(32))
                 continue
 
+            if args.verbose:
+                print("sampling...")
             prefix = node.sample()
 
             if prefix is None:
@@ -750,7 +787,7 @@ if __name__ == "__main__":
                 print("?", node.path.ljust(32), "input: " + prefix.hex())
 
             if args.verbose:
-                print("execute", binary)
+                print("executing", binary)
 
             code, outs, errs, symcc_log, verifier_out = execute_with_input(
                 binary, prefix, "traces/" + stem, i, args.timeout, args.maxlen
