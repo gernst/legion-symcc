@@ -22,8 +22,7 @@ BITS = 64
 
 def constraint_from_string(ast, decls):
     try:
-        (constraint,) = z3.parse_smt2_string(ast, decls=decls)
-        return constraint
+        return z3.parse_smt2_string(ast, decls=decls)
     except:
         write_smt2_trace(ast, decls, "log", "error")
         raise ValueError("Z3 parser error", ast)
@@ -41,26 +40,24 @@ def trace_from_file(trace):
 
         result = []
 
+        constraints = []
+
         ok = None
         last = None
 
         def flush():
             if pending:
-                ast = "(assert " + " ".join(pending) + ")"
-                assert ast
-
-                # parse_smt2_* returns a list
-                constraint = constraint_from_string(ast, decls)
-                event = (site, target, polarity, constraint)
+                # constraint = constraint_from_string(ast, decls)
+                event = (site, target, polarity, len(constraints))
                 result.append(event)
+
+                ast = "(assert " + " ".join(pending) + ")"
+                constraints.append(ast)
 
                 pending.clear()
 
-        index = 0
         for line in stream.readlines():
             line = line.strip()
-            index += 1
-            print("\rline", index)
 
             if not line:
                 continue
@@ -119,7 +116,15 @@ def trace_from_file(trace):
                 pending.append(line)
 
         flush()
-        # assert ok is not None
+
+        # parse all the stuff
+        ast = " ".join(constraints)
+        constraints = constraint_from_string(ast, decls)
+
+        for i in range(len(result)):
+            (site, target, polarity, index) = result[i]
+            result[i] = (site, target, polarity, constraints[index])
+
         return (ok, last, result)
 
 
@@ -592,6 +597,8 @@ if __name__ == "__main__":
     if len(sys.argv) == 2 and (sys.argv[1] == "-v" or sys.argv[1] == "--version"):
         print(VERSION)
         sys.exit(0)
+
+    sys.setrecursionlimit(1000 * 1000)
 
     parser = argparse.ArgumentParser(description="Legion")
     # parser.add_argument("-c", "--compile",
