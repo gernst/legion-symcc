@@ -199,15 +199,15 @@ class Arm:
 
 
 class Node:
-    def __init__(self, target, path, constraints, parent=None):
+    def __init__(self, target, path, pos, neg, parent=None):
         self.site = None
 
         self.target = target
         self.nbytes = len(target)
 
         self.path = path
-        self.constraints = constraints
-        self.depth = len(constraints)
+        self.pos  = pos
+        self.neg  = neg
 
         self.parent = parent
         self.yes = None
@@ -287,7 +287,40 @@ class Node:
         if self.parent:
             self.parent.exhaust(here=False)  # don't know yet
 
-    def insert(self, trace, is_complete, path="", constraints=[], index=0):
+    def insert(self, trace, is_complete):
+        base = None
+        node = self
+
+        for index in range(len(trace)):
+            # print(index)
+            was_phantom = node.is_phantom
+
+            assert not node.is_leaf
+            site, target, polarity, phi = trace[index]
+
+            if was_phantom:
+                # yes = phi
+                #no = z3.Not(phi) # SLOOOOW (hash consing)
+                node.is_phantom = False
+                node.site = site
+                # node.yes = Node(target, node.path + "1", node.constraints + [yes], parent=node)
+                # node.no = Node(target, node.path + "0", node.constraints + [no], parent=node)
+                node.yes = Node(target, self.path + "1", node.pos + [phi], node.neg, parent=node)
+                node.no = Node(target, self.path + "0", node.pos, node.neg + [phi], parent=node)
+
+                if is_complete and not base:
+                    base = Node
+
+            node = node.yes if polarity else node.no
+
+        if is_complete:
+            node.is_leaf = True
+            node.is_phantom = False
+            node.exhaust()
+        
+        return base, node
+
+    def _insert(self, trace, is_complete, index=0):
         was_phantom = self.is_phantom
 
         if index < len(trace):
@@ -297,18 +330,18 @@ class Node:
 
             yes = phi
             no = z3.Not(phi)
-            bit = "1" if polarity else "0"
             phi = yes if polarity else no
 
             if was_phantom:
                 self.is_phantom = False
                 self.site = site
-                self.yes = Node(target, path + "1", constraints + [yes], parent=self)
-                self.no = Node(target, path + "0", constraints + [no], parent=self)
+                raise None
+                #self.yes = Node(target, self.path + "1", self.constraints + [yes], parent=self)
+                #self.no = Node(target, self.path + "0", self.constraints + [no], parent=self)
 
             child = self.yes if polarity else self.no
-            base, leaf = child.insert(
-                trace, is_complete, path + bit, constraints + [phi], index + 1
+            base, leaf = child._insert(
+                trace, is_complete, index + 1
             )
         elif not is_complete:
             # print("integrated partial trace")
@@ -336,7 +369,8 @@ class Node:
 
         if self.sampler is None:
             solver = z3.Optimize()
-            solver.add(self.constraints)
+            solver.add(self.pos)
+            solver.add([z3.Not(phi) for phi in self.neg])
             # print("target     ", self.target, " with size", self.nbytes)
             # print("constraints", self.constraints)
             self.sampler = naive(solver, self.target)
@@ -359,9 +393,10 @@ class Node:
 
         if self.is_phantom:
             if self.is_exhausted:
-                # print("unexpected exhausted node in select")
-                self.pp()
-                print()
+                print("exhausted phantom node in select")
+                print("this can occur due to max trace length")
+                self.is_explored = True
+                self.exhaust()
             # assert not self.is_exhausted
             return self
         else:
@@ -625,7 +660,7 @@ if __name__ == "__main__":
         "-i",
         "--iterations",
         type=int,
-        default=10,
+        default=None,
         help="number of iterations (samples to generate)",
     )
     parser.add_argument(
@@ -676,12 +711,20 @@ if __name__ == "__main__":
     # z3_check_sparse_models()
 
     stem = os.path.basename(binary)
-    root = Node([], "", [])
+    root = Node([], "", [], [])
 
     write_metadata(source, "tests/" + stem)
 
     # try:
-    for i in range(1, args.iterations + 1):
+    i = 0
+
+    while True:
+        i += 1
+
+        if args.iterations and i >= args.iterations:
+            print("max iterations")
+            break
+
         try:
             # root.pp()
             root.check_invariants()
