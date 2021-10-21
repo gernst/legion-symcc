@@ -56,8 +56,11 @@ def trace_from_file(trace):
 
                 pending.clear()
 
+        index = 0
         for line in stream.readlines():
             line = line.strip()
+            index += 1
+            print("\rline", index)
 
             if not line:
                 continue
@@ -467,7 +470,7 @@ def write_metadata(file, path):
         stream.write("</test-metadata>\n")
 
 
-def write_testcase(lines, path, identifier):
+def write_testcase(source, path, identifier):
     sp.run(["mkdir", "-p", path])
     path = path + "/" + str(identifier) + ".xml"
 
@@ -477,8 +480,11 @@ def write_testcase(lines, path, identifier):
             '<!DOCTYPE testcase PUBLIC "+//IDN sosy-lab.org//DTD test-format testcase 1.1//EN" "https://sosy-lab.org/test-format/testcase-1.1.dtd">\n'
         )
         stream.write("<testcase>\n")
-        for line in lines:
-            stream.write(line.decode("utf-8"))
+
+        if source:
+            with open(source, "rt") as dump:
+                for line in dump.readlines():
+                    stream.write(line)
         stream.write("</testcase>\n")
 
 
@@ -499,11 +505,15 @@ def write_smt2_trace(ast, decls, path, identifier):
 
 def execute_with_input(binary, data, path, identifier, timeout=None, maxlen=None):
     sp.run(["mkdir", "-p", path])
-    path = path + "/" + str(identifier) + ".txt"
     # os.remove(path)
 
     env = {}
-    env["SYMCC_LOG_FILE"] = path
+
+    verifier_out = path + "/" + str(identifier) + ".out.txt"
+    env["VERIFIER_STDOUT"] = verifier_out
+
+    symcc_log = path + "/" + str(identifier) + ".txt"
+    env["SYMCC_LOG_FILE"] = symcc_log
 
     if timeout:
         env["SYMCC_TIMEOUT"] = str(timeout)
@@ -537,7 +547,7 @@ def execute_with_input(binary, data, path, identifier, timeout=None, maxlen=None
     outs = list(process.stdout.readlines())
     errs = list(process.stderr.readlines())
 
-    return code, outs, errs, path
+    return code, outs, errs, symcc_log, verifier_out
 
 
 def run(*args):
@@ -615,15 +625,15 @@ if __name__ == "__main__":
         "-t",
         "--timeout",
         type=int,
-        default=1,
-        help="binary execution timeout (default 1)",
+        default=None,
+        help="binary execution timeout (default: none)",
     )
     parser.add_argument(
         "-m",
         "--maxlen",
         type=int,
-        default=100,
-        help="maximum trace length (default: 100)",
+        default=None,
+        help="maximum trace length (default: none)",
     )
     parser.add_argument(
         "-L",
@@ -689,19 +699,30 @@ if __name__ == "__main__":
             else:
                 print("?", node.path.ljust(32), "input: " + prefix.hex())
 
-            code, outs, errs, path = execute_with_input(
+            if args.verbose:
+                print("execute", binary)
+
+            code, outs, errs, symcc_log, verifier_out = execute_with_input(
                 binary, prefix, "traces/" + stem, i, args.timeout, args.maxlen
             )
+
+            if code != 0:
+               print("return code: ", code)
+
+            if outs:
+                print("stdout:")
+                for line in outs:
+                    print(line.decode("utf-8"))
 
             if errs:
                 print("stderr:")
                 for line in errs:
                     print(line.decode("utf-8"))
-            # if code != 0:
-            #    print("code: ", code)
 
             try:
-                ok, last, trace = trace_from_file(path)
+                if args.verbose:
+                    print("parse trace", symcc_log)
+                ok, last, trace = trace_from_file(symcc_log)
             except Exception as e:
                 node.propagate(0, 1)
                 print("invalid trace", e)
@@ -714,7 +735,9 @@ if __name__ == "__main__":
 
             if not trace:
                 # testcov wants an empty test case
-                write_testcase(b"", "tests/" + stem, i)
+                if args.verbose:
+                    print("write empty testcase")
+                write_testcase(None, "tests/" + stem, i)
                 print("deterministic")
                 break
 
@@ -730,7 +753,9 @@ if __name__ == "__main__":
                 node.propagate(0, 1)
 
             if added:
-                write_testcase(outs, "tests/" + stem, i)
+                if args.verbose:
+                    print("write testcase", verifier_out)
+                write_testcase(verifier_out, "tests/" + stem, i)
                 print("+", leaf.path)
             elif not leaf.path.startswith(node.path):
                 print("!", leaf.path)  # missed a prefix
