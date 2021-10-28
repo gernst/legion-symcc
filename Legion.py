@@ -645,6 +645,7 @@ def compile_symcc(libs, source, binary):
         source, "__VERIFIER.c", "-o", binary
     ])
 
+    cmd.append("-fbracket-depth=1024")
     cmd.append("-lstdc++")
     cmd.append("-lm")
     cmd.append("-lSymRuntime")
