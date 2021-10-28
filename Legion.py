@@ -95,7 +95,7 @@ def trace_from_file(trace):
             elif line.startswith("abort"):
                 flush()
                 last = line
-                ok = False
+                ok = True
 
             elif line.startswith("segfault"):
                 flush()
@@ -599,7 +599,11 @@ def execute_with_input(binary, data, path, identifier, timeout=None, maxlen=None
     # write initial input
     process.stdin.write(data)
 
-    timer = threading.Timer(timeout, process.kill)
+    def kill():
+        print("killed")
+        process.kill()
+
+    timer = threading.Timer(timeout, kill)
     try:
         timer.start()
         # provide random input as further necessary
