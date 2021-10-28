@@ -46,6 +46,16 @@ char __VERIFIER_nondet_char() {
     return x;
 }
 
+char __VERIFIER_nondet_unsigned_char() {
+    __VERIFIER_initialize();
+
+    unsigned char x = 0;
+    read(0, &x, sizeof(x));
+    fprintf(output, "  <input type=\"unsigned char\">%d</input>\n", x);
+    fflush(output);
+    return x;
+}
+
 unsigned char __VERIFIER_nondet_uchar() {
     __VERIFIER_initialize();
     
