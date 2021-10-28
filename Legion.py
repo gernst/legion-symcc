@@ -10,6 +10,7 @@ import subprocess as sp
 import sys
 import z3
 import threading
+import signal
 
 from math import sqrt, log, ceil, inf
 
@@ -798,8 +799,10 @@ if __name__ == "__main__":
                 binary, prefix, "traces/" + stem, i, args.timeout, args.maxlen
             )
 
-            if code != 0:
-               print("return code: ", code)
+            if -31 <= code and code < 0:
+                print("signal: ", signal.Signals(-code).name)
+            elif code != 0:
+                print("return code: ", code)
 
             if outs:
                 print("stdout:")
