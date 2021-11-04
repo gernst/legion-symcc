@@ -26,7 +26,7 @@ lib32:
 README.html: README.md
 	pandoc $< -s -o $@
 
-docker:
+ubuntu2004:
 	docker build . -t gidonernst/legion-symcc
 	./docker-cp.sh
 

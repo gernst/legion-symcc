@@ -119,7 +119,7 @@ def trace_from_file(trace):
         flush()
 
         # parse all the stuff
-        ast = " ".join(constraints)
+        ast = "\n".join(constraints)
         constraints = constraint_from_string(ast, decls)
 
         for i in range(len(result)):
@@ -308,14 +308,17 @@ class Node:
         except StopIteration:
             return None
 
-    def select(self):
+    def select(self, bfs):
         if self.is_leaf:
             return self
         elif self.is_phantom:
             return self
         else:
-            options = [self.here, self.yes.tree, self.no.tree]
-
+            if bfs:
+                options = [self.yes.tree, self.no.tree]
+            else:
+                options = [self.here, self.yes.tree, self.no.tree]
+                
             N = self.tree.selected
 
             # print([arm.descr(N) for arm in options])
@@ -340,7 +343,7 @@ class Node:
             if node is self:
                 return node
             else:
-                return node.select()
+                return node.select(bfs)
 
     def pp_legend(self):
         print("              local              subtree")
@@ -504,7 +507,7 @@ def run(*args):
     print(*args)
     sp.run(args, stderr=sp.STDOUT)
      
-def compile_symcc(libs, source, binary):
+def compile_symcc(libs, source, binary, coverage=False):
     cmd = ["clang"]
 
     cmd.extend([
@@ -520,11 +523,14 @@ def compile_symcc(libs, source, binary):
     else:
         rpath = libs
 
+    if(coverage):
+        cmd.append("--coverage")
+    cmd.append("-fbracket-depth=1024")
+
     cmd.extend([
         source, "__VERIFIER.c", "-o", binary
     ])
 
-    cmd.append("-fbracket-depth=1024")
     cmd.append("-lstdc++")
     cmd.append("-lm")
     cmd.append("-lSymRuntime")
@@ -551,7 +557,9 @@ if __name__ == "__main__":
     #                     action='store_true',
     #                     help='compile binary (requires modified symcc on path, otherwise assume it has been compiled before)')
     parser.add_argument("file", help="C source file")
-    parser.add_argument("-r", "--rho", type=int, help="exploration factor (default: 1")
+    parser.add_argument("-c", "--coverage", action="store_true", help="generate coverage information")
+    parser.add_argument("-b", "--bfs", action="store_true", help="BFS exploration (default: false)")
+    parser.add_argument("-r", "--rho", type=int, help="exploration factor (default: 1)")
     parser.add_argument("-s", "--seed", type=int, default=0, help="random seed")
     parser.add_argument("-q", "--quiet", action="store_true", help="less output")
     parser.add_argument("-V", "--verbose", action="store_true", help="more output")
@@ -618,7 +626,7 @@ if __name__ == "__main__":
 
     if is_c:
         binary = source[:-2]
-        compile_symcc(args.library, source, binary)
+        compile_symcc(args.library, source, binary, args.coverage)
     else:
         binary = source
         source = binary + ".c"
@@ -632,6 +640,8 @@ if __name__ == "__main__":
 
     # try:
     i = 0
+
+    empty_testcase_written = False
 
     while True:
         i += 1
@@ -648,7 +658,13 @@ if __name__ == "__main__":
 
             if args.verbose:
                 print("selecting")
-            node = root.select()
+            node = root.select(args.bfs)
+
+            if node.is_leaf:
+                node.propagate(0, 1)
+                print("$", node.path.ljust(32))
+                continue
+
             # node.selected += 1
 
             if args.verbose:
@@ -699,12 +715,14 @@ if __name__ == "__main__":
                 continue
 
             if not trace:
-                # testcov wants an empty test case
-                if args.verbose:
-                    print("write empty testcase")
-                write_testcase(None, "tests/" + stem, i)
+                if not empty_testcase_written:
+                    # testcov wants an empty test case
+                    if args.verbose:
+                        print("write empty testcase")
+                    write_testcase(None, "tests/" + stem, i)
+                    empty_testcase_written = True
                 print("deterministic")
-                break
+                continue
 
             bits = ["1" if bit else "0" for (_, _, bit, _) in trace]
             print("<", "".join(bits))
@@ -741,6 +759,24 @@ if __name__ == "__main__":
         print("final tree")
         root.pp_legend()
         print()
+
+    if args.coverage:
+        stem = os.path.basename(binary)
+        gcda = stem + ".gcda"
+        gcno = stem + ".gcno"
+        cmd = ["llvm-cov", "gcov", "-b", "-n", gcda]
+        run(*cmd)
+
+        def try_remove(path):
+            try:
+                os.remove(path)
+            except:
+                pass
+
+        try_remove(gcda)
+        try_remove(gcno)
+        try_remove("__VERIFIER.gcda")
+        try_remove("__VERIFIER.gcno")
 
     if args.testcov or args.zip:
         suite = "tests/" + stem + ".zip"

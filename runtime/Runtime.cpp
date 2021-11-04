@@ -117,6 +117,8 @@ namespace {
     Expr g_zero("0", 0, nullptr);
     Expr g_bit0("#b0", 1, nullptr);
 
+    const char *status = "exit";
+
     size_t traceLength;
 }
 
@@ -125,31 +127,29 @@ void hard_shutdown() {
     close(0);
     close(1);
     close(2);
-    raise(SIGKILL);
+    // raise(SIGKILL);
+    exit(0);
 }
 
 void _sym_finalize(void) {
     *out << std::endl; // clear any partial output
-    *out << "exit" << std::endl;
-    hard_shutdown();
+    *out << status << std::endl;
+    // hard_shutdown();
 }
 
 void _sym_abort(int code) {
-    *out << std::endl; // clear any partial output
-    *out << "abort" << std::endl;
-    hard_shutdown();
+    status = "abort";
+    exit(0);
 }
 
 void _sym_segfault(int code) {
-    *out << std::endl; // clear any partial output
-    *out << "segfault" << std::endl;
-    hard_shutdown();
+    status = "segfault";
+    exit(0);
 }
 
 void _sym_timeout(int) {
-    *out << std::endl; // clear any partial output
-    *out << "timeout" << std::endl;
-    hard_shutdown();
+    status = "timeout";
+    exit(0);
 }
 
 void _sym_unsupported() {
@@ -178,6 +178,7 @@ void _sym_initialize(void) {
 
     signal(SIGABRT, _sym_abort);
     signal(SIGSEGV, _sym_segfault); // may be a leaf, we do not know!
+    signal(SIGBUS, _sym_segfault); // may be a leaf, we do not know!
 
     atexit(_sym_finalize);
 }
