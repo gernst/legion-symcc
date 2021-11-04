@@ -26,7 +26,7 @@ lib32:
 README.html: README.md
 	pandoc $< -s -o $@
 
-ubuntu2004:
+docker: lib/libSymbolize.so lib/libSymRuntime.so lib32/libSymRuntime.so
 	docker build . -t gidonernst/legion-symcc
 	./docker-cp.sh
 

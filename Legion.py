@@ -14,6 +14,7 @@ import signal
 
 from math import sqrt, log, ceil, inf
 
+BFS = True
 RHO = 1
 INPUTS = set()
 KNOWN  = set()
@@ -558,7 +559,6 @@ if __name__ == "__main__":
     #                     help='compile binary (requires modified symcc on path, otherwise assume it has been compiled before)')
     parser.add_argument("file", help="C source file")
     parser.add_argument("-c", "--coverage", action="store_true", help="generate coverage information")
-    parser.add_argument("-b", "--bfs", action="store_true", help="BFS exploration (default: false)")
     parser.add_argument("-r", "--rho", type=int, help="exploration factor (default: 1)")
     parser.add_argument("-s", "--seed", type=int, default=0, help="random seed")
     parser.add_argument("-q", "--quiet", action="store_true", help="less output")
@@ -587,8 +587,8 @@ if __name__ == "__main__":
         "-t",
         "--timeout",
         type=int,
-        default=None,
-        help="binary execution timeout (default: none)",
+        default=3,
+        help="binary execution timeout in seconds (default: 3)",
     )
     parser.add_argument(
         "-m",
@@ -658,7 +658,7 @@ if __name__ == "__main__":
 
             if args.verbose:
                 print("selecting")
-            node = root.select(args.bfs)
+            node = root.select(BFS)
 
             if node.is_leaf:
                 node.propagate(0, 1)
@@ -763,7 +763,6 @@ if __name__ == "__main__":
     if args.coverage:
         stem = os.path.basename(binary)
         gcda = stem + ".gcda"
-        gcno = stem + ".gcno"
         cmd = ["llvm-cov", "gcov", "-b", "-n", gcda]
         run(*cmd)
 
@@ -774,9 +773,7 @@ if __name__ == "__main__":
                 pass
 
         try_remove(gcda)
-        try_remove(gcno)
         try_remove("__VERIFIER.gcda")
-        try_remove("__VERIFIER.gcno")
 
     if args.testcov or args.zip:
         suite = "tests/" + stem + ".zip"
