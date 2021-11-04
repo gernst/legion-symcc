@@ -223,8 +223,11 @@ Expr * _sym_build_bool(bool value)   { return value ? &g_true : &g_false; }
 #define SAME1(fun, x)   ((x)->bits)
 
 uint8_t SAME2(const char *fun, Expr *a, Expr *b) {
-    if(a->bits != b->bits)
+    if(a->bits != b->bits) {
+        std::cerr << "cannot construct:" << std::endl;
         std::cerr << "(" << fun << " " << *a << " " << *b << ")" << std::endl;
+        std::cerr << "with bits " << (int)a->bits << " and " << (int)b->bits << std::endl;
+    }
     assert(a->bits == b->bits);
     return a->bits;
 }
@@ -321,7 +324,7 @@ Expr * _sym_build_not_equal(Expr * a, Expr * b) {
 }
 
 Expr * _sym_build_sext(Expr * expr, uint8_t bits) {
-    if(expr->bits == bits) {
+    if(0 == bits) {
         return expr;
     } else {
         std::string fun = "(_ sign_extend " + decimal(bits) + ")";
@@ -330,7 +333,7 @@ Expr * _sym_build_sext(Expr * expr, uint8_t bits) {
 }
 
 Expr * _sym_build_zext(Expr * expr, uint8_t bits) {
-    if(expr->bits == bits) {
+    if(0 == bits) {
         return expr;
     } else {
         std::string fun = "(_ zero_extend " + decimal(bits) + ")";
