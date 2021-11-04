@@ -163,9 +163,9 @@ def naive(solver, target):
         solver.push()
         solver.add(result ^ delta == guess)
 
-        for known in KNOWN:
-            if result.size() == known.size():
-                solver.add(result != known)
+        # for known in KNOWN:
+        #     if result.size() == known.size():
+        #         solver.add(result != known)
 
         if solver.check() != z3.sat:
             break
@@ -190,33 +190,13 @@ class Arm:
         self.selected = 0
 
     def score(self, N):
-        if self.node.is_explored:
+        if self.node.is_leaf:
             return -inf
         else:
             return uct(self.reward, self.selected, N)
 
     def descr(self, N):
         return "uct(%d, %d, %d)" % (self.reward, self.selected, N)
-
-class Insert:
-    def __init__(self, node, trace, is_complete, index):
-        self.node = node
-        self.trace = trace
-        self.is_complete = is_complete
-        self.index = index
-
-        self.is_explored = False
-        self.tree = node.tree
-
-    def force(self):
-        self.node.insert(self.trace, self.is_complete, self.index)
-        return self.node
-
-    def pp(self):
-        print("i")
-
-    def check_invariants(self):
-        pass
 
 class Node:
     def __init__(self, target, path, pos, neg, parent=None):
@@ -238,11 +218,6 @@ class Node:
         self.is_phantom = True
         self.is_leaf = False
 
-        # do not sample at this particular node
-        self.is_exhausted = False
-        # do not sample anywhere in the subtree
-        self.is_explored = False
-
         # statistics collected for sampling in this node and subtree, respectively
         self.here = Arm(self)
         self.tree = Arm(self)
@@ -257,22 +232,13 @@ class Node:
                 assert not self.is_leaf
                 assert not self.yes
                 assert not self.no
-                # assert not self.is_exhausted
-                # assert not self.is_explored
             elif self.is_leaf:
                 assert not self.yes
                 assert not self.no
-                assert self.is_exhausted
-                assert self.is_explored
             else:
                 assert self.site
                 assert self.yes
                 assert self.no
-
-                if self.is_explored:
-                    # assert self.is_exhausted
-                    assert self.yes.is_explored
-                    assert self.no.is_explored
 
                 self.yes.check_invariants()
                 self.no.check_invariants()
@@ -290,22 +256,6 @@ class Node:
 
         if self.parent:
             self.parent.propagate(reward, selected, here=False)
-
-    def exhaust(self, here=True):
-        if here:
-            self.is_exhausted = True
-
-        if self.is_leaf:
-            assert here
-            self.is_explored = True
-        elif self.is_phantom:
-            assert here
-            # self.is_explored = self.is_exhausted
-        else:
-            self.is_explored = self.yes.is_explored and self.no.is_explored
-
-        if self.parent:
-            self.parent.exhaust(here=False)  # don't know yet
 
     def insert(self, trace, is_complete):
         base = None
@@ -336,67 +286,11 @@ class Node:
         if is_complete:
             node.is_leaf = True
             node.is_phantom = False
-            node.exhaust()
         
         return base, node
 
-    def _insert(self, trace, is_complete, index=0):
-        was_phantom = self.is_phantom
-
-        if index < len(trace):
-            assert not self.is_leaf
-
-            site, target, polarity, phi = trace[index]
-
-            if was_phantom:
-                self.is_phantom = False
-                self.site = site
-                
-                yes = Node(target, self.path + "1", self.pos + [phi], self.neg, parent=self)
-                no = Node(target, self.path + "0", self.pos, self.neg + [phi], parent=self)
-
-                # delay inserting this trace
-                if polarity:
-                    self.yes = Insert(yes, trace, is_complete, index + 1)
-                    self.no = no
-                    return self, yes
-                else:
-                    self.yes = yes
-                    self.no = Insert(no, trace, is_complete, index + 1)
-                    return self, no
-
-            else:
-                if polarity:
-                    if hasattr(self.yes, "force"):
-                        self.yes = self.yes.force()
-                    return self.yes.insert(trace, is_complete, index + 1)
-                else:
-                    if hasattr(self.no, "force"):
-                        self.no = self.no.force()
-                    return self.no.insert(trace, is_complete, index + 1)
-
-        elif not is_complete:
-            # print("integrated partial trace")
-            # base, leaf = None, self.parent
-            return None, self
-
-        else:
-            self.is_leaf = True
-            self.is_phantom = False
-            # print("exhaust leaf at", self.path)
-            self.exhaust()
-
-            if was_phantom:
-                return self, self
-            else:
-                return None, self
-
     def sample(self):
-        assert not self.is_exhausted
-
         if not self.target:
-            # print("exhaust non-target at", self.path)
-            self.exhaust()
             return b""  # no bytes to sample
 
         if self.sampler is None:
@@ -412,33 +306,15 @@ class Node:
             return sample
 
         except StopIteration:
-            # print("exhaust via sampler", self.path)
-            # print("target     ", self.target)
-            # print("constraints", self.constraints)
-            # print("inputs     ", [i.hex() for i in INPUTS])
-            self.exhaust()
             return None
 
     def select(self):
-        assert not self.is_leaf
-        assert not self.is_explored
-
-        if self.is_phantom:
-            if self.is_exhausted:
-                print("exhausted phantom node in select")
-                print("this can occur due to max trace length")
-                self.is_explored = True
-                self.exhaust()
-            # assert not self.is_exhausted
+        if self.is_leaf:
+            return self
+        elif self.is_phantom:
             return self
         else:
-            options = []
-            if not self.is_exhausted:
-                options.append(self.here)
-            if not self.yes.is_explored:
-                options.append(self.yes.tree)
-            if not self.no.is_explored:
-                options.append(self.no.tree)
+            options = [self.here, self.yes.tree, self.no.tree]
 
             N = self.tree.selected
 
@@ -462,14 +338,13 @@ class Node:
             node = arm.node
 
             if node is self:
-                assert not self.is_exhausted
                 return node
             else:
                 return node.select()
 
     def pp_legend(self):
-        print("      local      subtree")
-        print("   win  try     win  try    path")
+        print("              local              subtree")
+        print("    score  win  try      score  win  try    path")
         self.pp()
 
     def pp(self):
@@ -477,18 +352,17 @@ class Node:
             key = "*"
         elif self.is_leaf:
             key = "$"
-        elif self.is_explored:
-            key = "E"
-        elif self.is_exhausted:
-            key = "e"
         elif self.is_phantom:
             key = "?"
         else:
             key = "."
 
+
+        N = self.tree.selected
+
         if True or key != ".":
-            a = "%4d %4d" % (self.here.reward, self.here.selected)
-            b = "%4d %4d" % (self.tree.reward, self.tree.selected)
+            a = "{:7.2f} {:4d} {:4d}".format(self.here.score(N), self.here.reward, self.here.selected)
+            b = "{:7.2f} {:4d} {:4d}".format(self.tree.score(N), self.tree.reward, self.tree.selected)
             print(key, a, "  ", b, "  ", self.path)
 
         if key != "E":
@@ -772,18 +646,10 @@ if __name__ == "__main__":
                 print("checking invariants")
             root.check_invariants()
 
-            if root.is_explored:
-                print("explored")
-                break
-
             if args.verbose:
                 print("selecting")
             node = root.select()
             # node.selected += 1
-
-            if node.is_exhausted:
-                print("e", node.path.ljust(32))
-                continue
 
             if args.verbose:
                 print("sampling...")
@@ -811,12 +677,12 @@ if __name__ == "__main__":
             if outs:
                 print("stdout:")
                 for line in outs:
-                    print(line.decode("utf-8"))
+                    print(line.decode("utf-8").strip())
 
             if errs:
                 print("stderr:")
                 for line in errs:
-                    print(line.decode("utf-8"))
+                    print(line.decode("utf-8").strip())
 
             try:
                 if args.verbose:
@@ -828,9 +694,9 @@ if __name__ == "__main__":
                 continue
 
             if not ok:
-                # node.propagate(0, 1)
+                node.propagate(0, 1)
                 print("partial trace: ", last)
-                # continue
+                continue
 
             if not trace:
                 # testcov wants an empty test case
@@ -858,13 +724,6 @@ if __name__ == "__main__":
                 print("+", leaf.path)
             elif not leaf.path.startswith(node.path):
                 print("!", leaf.path)  # missed a prefix
-                # for a precise sampler, this means that we have a bogus node here
-                # that should be regarded as an unreachable leaf
-                # print("exhaust missed path", node.path)
-                # node.pp()
-                # node.is_leaf = True
-                # node.is_phantom = False
-                # node.exhaust()
                 # raise Exception("failed to preserve prefix (naive sampler is precise)")
         except Exception as e:
             print()
