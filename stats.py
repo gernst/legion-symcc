@@ -8,8 +8,6 @@ import sys
 START = "https://test-comp.sosy-lab.org/2022/results/results-verified/legion-symcc"
 END = ".merged.xml.bz2\n"
 
-url = "file:///home/ernst/downloads/legion-symcc.2021-10-29_16-22-24.results.Test-Comp22_coverage-branches.ReachSafety-BitVectors.xml.bz2.merged.xml.bz2"
-
 def avg(xs):
     return sum(xs) / len(xs) if xs else 0.0
 

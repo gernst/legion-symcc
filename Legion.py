@@ -677,6 +677,7 @@ if __name__ == "__main__":
     #                     action='store_true',
     #                     help='compile binary (requires modified symcc on path, otherwise assume it has been compiled before)')
     parser.add_argument("file", help="C source file")
+    parser.add_argument("-r", "--rho", type=int, help="exploration factor (default: 1")
     parser.add_argument("-s", "--seed", type=int, default=0, help="random seed")
     parser.add_argument("-q", "--quiet", action="store_true", help="less output")
     parser.add_argument("-V", "--verbose", action="store_true", help="more output")
@@ -729,6 +730,9 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     random.seed(args.seed)
+
+    if args.rho:
+        RHO = args.rho
 
     source = args.file
     is_c = source[-2:] == ".c" or source[-2:] == ".i"
