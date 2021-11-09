@@ -26,7 +26,7 @@ def constraint_from_string(ast, decls):
     try:
         return z3.parse_smt2_string(ast, decls=decls)
     except:
-        write_smt2_trace(ast, decls, "log", "error")
+        # write_smt2_trace(ast, decls, "log", "error")
         raise ValueError("Z3 parser error", ast)
 
 
@@ -662,7 +662,8 @@ if __name__ == "__main__":
 
             if node.is_leaf:
                 node.propagate(0, 1)
-                print("$", node.path.ljust(32))
+                if args.verbose:
+                    print("$", node.path.ljust(32))
                 continue
 
             # node.selected += 1
@@ -673,7 +674,8 @@ if __name__ == "__main__":
 
             if prefix is None:
                 node.propagate(0, 1)
-                print("e", node.path.ljust(32))
+                if args.verbose:
+                    print("e", node.path.ljust(32))
                 continue
             else:
                 print("?", node.path.ljust(32), "input: " + prefix.hex())
@@ -682,7 +684,7 @@ if __name__ == "__main__":
                 print("executing", binary)
 
             code, outs, errs, symcc_log, verifier_out = execute_with_input(
-                binary, prefix, "traces/" + stem, i, args.timeout, args.maxlen
+                binary, prefix, "traces/" + stem, "trace", args.timeout, args.maxlen
             )
 
             if -31 <= code and code < 0:
@@ -691,12 +693,14 @@ if __name__ == "__main__":
                 print("return code: ", code)
 
             if outs:
-                print("stdout:")
+                if args.verbose:
+                    print("stdout:")
                 for line in outs:
                     print(line.decode("utf-8").strip())
 
             if errs:
-                print("stderr:")
+                if args.verbose:
+                    print("stderr:")
                 for line in errs:
                     print(line.decode("utf-8").strip())
 
@@ -706,12 +710,14 @@ if __name__ == "__main__":
                 ok, last, trace = trace_from_file(symcc_log)
             except Exception as e:
                 node.propagate(0, 1)
-                print("invalid trace", e)
+                if args.verbose:
+                    print("invalid trace", e)
                 continue
 
             if not ok:
                 node.propagate(0, 1)
-                print("partial trace: ", last)
+                if args.verbose:
+                    print("partial trace: ", last)
                 continue
 
             if not trace:
@@ -721,11 +727,13 @@ if __name__ == "__main__":
                         print("write empty testcase")
                     write_testcase(None, "tests/" + stem, i)
                     empty_testcase_written = True
-                print("deterministic")
+                if args.verbose:
+                    print("deterministic")
                 continue
 
             bits = ["1" if bit else "0" for (_, _, bit, _) in trace]
-            print("<", "".join(bits))
+            if args.verbose:
+                print("<", "".join(bits))
 
             added, leaf = root.insert(trace, ok)
             _, _, path, _ = zip(*trace)
@@ -744,8 +752,8 @@ if __name__ == "__main__":
                 print("!", leaf.path)  # missed a prefix
                 # raise Exception("failed to preserve prefix (naive sampler is precise)")
         except Exception as e:
-            print()
-            if not args.quiet:
+            if args.verbose:
+                print()
                 print("current tree")
                 root.pp_legend()
             raise e

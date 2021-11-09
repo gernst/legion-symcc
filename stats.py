@@ -5,7 +5,7 @@ import io
 import re
 import sys
 
-START = "https://test-comp.sosy-lab.org/2022/results/results-verified/legion-symcc"
+START = "https://test-comp.sosy-lab.org/2022/results/results-verified/"
 END = ".merged.xml.bz2\n"
 
 def avg(xs):
@@ -16,8 +16,8 @@ def open_url(url):
 
 def score_from_run(node):
     columns = [column for column in node if column.get("title") == "score"]
-    if len(columns) != 1:
-        print(len(columns))
+    if len(columns) == 0:
+        return 0
     assert len(columns) == 1
     first, = columns
     return float(first.get("value"))
