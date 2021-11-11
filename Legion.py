@@ -17,7 +17,7 @@ from math import sqrt, log, ceil, inf
 BFS = True
 RHO = 1
 INPUTS = set()
-KNOWN  = set()
+KNOWN = set()
 VERSION = "testcomp2022"
 BITS = 64
 
@@ -44,7 +44,7 @@ def trace_from_file(trace):
 
         constraints = []
 
-        ok = None
+        is_complete = None
         last = None
 
         def flush():
@@ -65,19 +65,18 @@ def trace_from_file(trace):
                 continue
 
             last = line
-            assert ok is None
+            assert is_complete is None
 
             if line.startswith("in  "):
                 flush()
 
                 k = int(line[4:])
-                n = "stdin" + str(k)
-                x = z3.BitVec(n, 8)
-                assert k == nbytes
-                nbytes = nbytes + 1
-
-                decls[n] = x
-                target.append(x)
+                while nbytes < k:
+                    n = "stdin" + str(nbytes)
+                    x = z3.BitVec(n, 8)
+                    decls[n] = x
+                    target.append(x)
+                    nbytes = nbytes + 1
 
             elif line.startswith("yes "):
                 flush()
@@ -92,27 +91,27 @@ def trace_from_file(trace):
             elif line.startswith("exit"):
                 flush()
                 last = line
-                ok = True
+                is_complete = True
 
             elif line.startswith("abort"):
                 flush()
                 last = line
-                ok = True
+                is_complete = True  # used by benchmark tasks
 
             elif line.startswith("segfault"):
                 flush()
                 last = line
-                ok = False
+                is_complete = False
 
             elif line.startswith("unsupported"):
                 flush()
                 last = line
-                ok = False
+                is_complete = False
 
             elif line.startswith("timeout"):
                 flush()
                 last = line
-                ok = False
+                is_complete = False
 
             else:
                 pending.append(line)
@@ -127,7 +126,7 @@ def trace_from_file(trace):
             (site, target, polarity, index) = result[i]
             result[i] = (site, target, polarity, constraints[index])
 
-        return (ok, last, result)
+        return (is_complete, last, result)
 
 
 # higher is better
@@ -174,7 +173,7 @@ def naive(solver, target):
         model = solver.model()
         value = model[result]
 
-        sample = int_to_bytes(value.as_long(), n//8)
+        sample = int_to_bytes(value.as_long(), n // 8)
 
         solver.pop()
 
@@ -199,6 +198,7 @@ class Arm:
     def descr(self, N):
         return "uct(%d, %d, %d)" % (self.reward, self.selected, N)
 
+
 class Node:
     def __init__(self, target, path, pos, neg, parent=None):
         self.site = None
@@ -207,8 +207,8 @@ class Node:
         self.nbytes = len(target)
 
         self.path = path
-        self.pos  = pos
-        self.neg  = neg
+        self.pos = pos
+        self.neg = neg
 
         self.parent = parent
         self.yes = None
@@ -271,15 +271,19 @@ class Node:
 
             if was_phantom:
                 # yes = phi
-                #no = z3.Not(phi) # SLOOOOW (hash consing)
+                # no = z3.Not(phi) # SLOOOOW (hash consing)
                 node.is_phantom = False
                 node.site = site
                 # node.yes = Node(target, node.path + "1", node.constraints + [yes], parent=node)
                 # node.no = Node(target, node.path + "0", node.constraints + [no], parent=node)
-                node.yes = Node(target, node.path + "1", node.pos + [phi], node.neg, parent=node)
-                node.no = Node(target, node.path + "0", node.pos, node.neg + [phi], parent=node)
+                node.yes = Node(
+                    target, node.path + "1", node.pos + [phi], node.neg, parent=node
+                )
+                node.no = Node(
+                    target, node.path + "0", node.pos, node.neg + [phi], parent=node
+                )
 
-                if is_complete and not base:
+                if not base:
                     base = node
 
             node = node.yes if polarity else node.no
@@ -287,7 +291,7 @@ class Node:
         if is_complete:
             node.is_leaf = True
             node.is_phantom = False
-        
+
         return base, node
 
     def sample(self):
@@ -319,7 +323,7 @@ class Node:
                 options = [self.yes.tree, self.no.tree]
             else:
                 options = [self.here, self.yes.tree, self.no.tree]
-                
+
             N = self.tree.selected
 
             # print([arm.descr(N) for arm in options])
@@ -361,12 +365,15 @@ class Node:
         else:
             key = "."
 
-
         N = self.tree.selected
 
         if True or key != ".":
-            a = "{:7.2f} {:4d} {:4d}".format(self.here.score(N), self.here.reward, self.here.selected)
-            b = "{:7.2f} {:4d} {:4d}".format(self.tree.score(N), self.tree.reward, self.tree.selected)
+            a = "{:7.2f} {:4d} {:4d}".format(
+                self.here.score(N), self.here.reward, self.here.selected
+            )
+            b = "{:7.2f} {:4d} {:4d}".format(
+                self.tree.score(N), self.tree.reward, self.tree.selected
+            )
             print(key, a, "  ", b, "  ", self.path)
 
         if key != "E":
@@ -467,7 +474,7 @@ def execute_with_input(binary, data, path, identifier, timeout=None, maxlen=None
 
     if timeout:
         env["SYMCC_TIMEOUT"] = str(timeout)
-        timeout += 1 # let the process have 1s of graceful shutdown
+        timeout += 1  # let the process have 1s of graceful shutdown
     if maxlen:
         env["SYMCC_MAX_TRACE_LENGTH"] = str(maxlen)
 
@@ -506,14 +513,13 @@ def execute_with_input(binary, data, path, identifier, timeout=None, maxlen=None
 
 def run(*args):
     print(*args)
-    sp.run(args, stderr=sp.STDOUT)
-     
+    return sp.run(args, stderr=sp.STDOUT)
+
+
 def compile_symcc(libs, source, binary, coverage=False):
     cmd = ["clang"]
 
-    cmd.extend([
-        "-Xclang", "-load", "-Xclang", libs + "/libSymbolize.so"
-    ])
+    cmd.extend(["-Xclang", "-load", "-Xclang", libs + "/libSymbolize.so"])
 
     if BITS == 32:
         rpath = libs + "32"
@@ -524,20 +530,18 @@ def compile_symcc(libs, source, binary, coverage=False):
     else:
         rpath = libs
 
-    if(coverage):
+    if coverage:
         cmd.append("--coverage")
     cmd.append("-fbracket-depth=1024")
 
-    cmd.extend([
-        source, "__VERIFIER.c", "-o", binary
-    ])
+    cmd.extend([source, "__VERIFIER.c", "-o", binary])
 
     cmd.append("-lstdc++")
     cmd.append("-lm")
     cmd.append("-lSymRuntime")
     cmd.append("-L" + rpath)
     cmd.append("-Wl,-rpath," + rpath)
-    
+
     run(*cmd)
     print()
 
@@ -545,6 +549,7 @@ def compile_symcc(libs, source, binary, coverage=False):
 def zip_files(file, paths):
     run("zip", "-r", file, *paths)
     print()
+
 
 if __name__ == "__main__":
     if len(sys.argv) == 2 and (sys.argv[1] == "-v" or sys.argv[1] == "--version"):
@@ -558,7 +563,9 @@ if __name__ == "__main__":
     #                     action='store_true',
     #                     help='compile binary (requires modified symcc on path, otherwise assume it has been compiled before)')
     parser.add_argument("file", help="C source file")
-    parser.add_argument("-c", "--coverage", action="store_true", help="generate coverage information")
+    parser.add_argument(
+        "-c", "--coverage", action="store_true", help="generate coverage information"
+    )
     parser.add_argument("-r", "--rho", type=int, help="exploration factor (default: 1)")
     parser.add_argument("-s", "--seed", type=int, default=0, help="random seed")
     parser.add_argument("-q", "--quiet", action="store_true", help="less output")
@@ -596,6 +603,13 @@ if __name__ == "__main__":
         type=int,
         default=None,
         help="maximum trace length (default: none)",
+    )
+    parser.add_argument(
+        "-a",
+        "--adaptive",
+        type=int,
+        default=True,
+        help="adaptively increase maximum trace length (default: true if -m is not given",
     )
     parser.add_argument(
         "-L",
@@ -642,6 +656,13 @@ if __name__ == "__main__":
     i = 0
 
     empty_testcase_written = False
+    ntestcases = 0
+
+    def interrupt(number, frame):
+        print("received SIGTERM")
+        raise StopIteration()
+
+    signal.signal(signal.SIGTERM, interrupt)
 
     while True:
         i += 1
@@ -666,8 +687,6 @@ if __name__ == "__main__":
                     print("$", node.path.ljust(32))
                 continue
 
-            # node.selected += 1
-
             if args.verbose:
                 print("sampling...")
             prefix = node.sample()
@@ -683,8 +702,24 @@ if __name__ == "__main__":
             if args.verbose:
                 print("executing", binary)
 
+            maxlen = None
+
+            if args.maxlen:
+                maxlen = args.maxlen
+
+            if args.adaptive or not args.maxlen:
+                if ntestcases < 100:
+                    maxlen = 100
+                elif ntestcases < 1000:
+                    maxlen = 1000
+                else:
+                    maxlen = 10000
+
+            if maxlen and args.maxlen and maxlen > args.maxlen:
+                maxlen = args.maxlen
+
             code, outs, errs, symcc_log, verifier_out = execute_with_input(
-                binary, prefix, "traces/" + stem, "trace", args.timeout, args.maxlen
+                binary, prefix, "traces/" + stem, "trace", args.timeout, maxlen
             )
 
             if -31 <= code and code < 0:
@@ -707,18 +742,18 @@ if __name__ == "__main__":
             try:
                 if args.verbose:
                     print("parse trace", symcc_log)
-                ok, last, trace = trace_from_file(symcc_log)
+                is_complete, last, trace = trace_from_file(symcc_log)
             except Exception as e:
                 node.propagate(0, 1)
                 if args.verbose:
                     print("invalid trace", e)
                 continue
 
-            if not ok:
-                node.propagate(0, 1)
+            if not is_complete:
+                # node.propagate(0, 1)
                 if args.verbose:
                     print("partial trace: ", last)
-                continue
+                # continue
 
             if not trace:
                 if not empty_testcase_written:
@@ -735,7 +770,7 @@ if __name__ == "__main__":
             if args.verbose:
                 print("<", "".join(bits))
 
-            added, leaf = root.insert(trace, ok)
+            added, leaf = root.insert(trace, is_complete)
             _, _, path, _ = zip(*trace)
 
             if added:
@@ -747,10 +782,17 @@ if __name__ == "__main__":
                 if args.verbose:
                     print("write testcase", verifier_out)
                 write_testcase(verifier_out, "tests/" + stem, i)
+                ntestcases += 1
                 print("+", leaf.path)
             elif not leaf.path.startswith(node.path):
                 print("!", leaf.path)  # missed a prefix
                 # raise Exception("failed to preserve prefix (naive sampler is precise)")
+        except KeyboardInterrupt:
+            print("keyboard interrupt")
+            break
+        except StopIteration:
+            print("signal interrupt")
+            break
         except Exception as e:
             if args.verbose:
                 print()
@@ -760,6 +802,7 @@ if __name__ == "__main__":
 
     print("done")
     print()
+
     # except:
     #     print("error")
 
@@ -768,11 +811,19 @@ if __name__ == "__main__":
         root.pp_legend()
         print()
 
+    print("tests: " + str(ntestcases))
+    print()
+
     if args.coverage:
-        stem = os.path.basename(binary)
-        gcda = stem + ".gcda"
-        cmd = ["llvm-cov", "gcov", "-b", "-n", gcda]
-        run(*cmd)
+        def gcov(gcda):
+            cmd = ["llvm-cov", "gcov", "-b", "-n", gcda]
+            proc = sp.Popen(cmd, stdout=sp.PIPE, stderr=sp.PIPE)
+            for line in proc.stdout.readlines():
+                line = line.decode("utf-8").rstrip()
+                print(line)
+                if line.startswith("Branches executed:"):
+                    cov = float(line[18:21]) # two digits of accuracy
+                    print("score: " + str(cov/100))
 
         def try_remove(path):
             try:
@@ -780,6 +831,9 @@ if __name__ == "__main__":
             except:
                 pass
 
+        stem = os.path.basename(binary)
+        gcda = stem + ".gcda"
+        gcov(gcda)
         try_remove(gcda)
         try_remove("__VERIFIER.gcda")
 
@@ -799,7 +853,8 @@ if __name__ == "__main__":
             [
                 "--no-isolation",
                 "--no-plots",
-                "--timelimit-per-run", "3",
+                "--timelimit-per-run",
+                "3",
                 "--test-suite",
                 suite,
                 source,

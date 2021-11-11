@@ -205,7 +205,6 @@ Expr * _sym_get_input_byte(size_t offset) {
         return input[offset];
 
     auto name = variable("stdin", n);
-    *out << "in  " << n << std::endl;
 
     auto expr = CONST(name, 8);
     input.push_back(expr);
@@ -350,6 +349,14 @@ void _sym_push_path_constraint(Expr * constraint, int taken,
                                uintptr_t site_id) {
     if (constraint == nullptr)
         return;
+
+    static size_t last_input_size = 0;
+
+    auto n = input.size();
+    if(n > last_input_size) {
+        last_input_size = n;
+        *out << "in  " << n << std::endl;
+    }
 
     traceLength++;
     if(g_config.maximumTraceLength > 0 && traceLength > g_config.maximumTraceLength) {

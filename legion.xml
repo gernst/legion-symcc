@@ -7,7 +7,7 @@
   <option name="-L">ubuntu2004/lib</option>
   <!-- <option name="-t">1</option>
   <option name="-m">100</option> -->
-  <option name="-i">20</option>
+  <option name="-i">1000</option> -->
   <option name="-c" />
 
   <resultfiles>**.xml</resultfiles>
@@ -79,6 +79,8 @@
   </tasks>
   
   <columns>
+    <column title="tests">tests:</column>
+    <column title="score">score:</column>
     <column title="lines_covered">Lines executed:</column>
     <column title="branches_covered">Branches executed:</column>
   </columns>
