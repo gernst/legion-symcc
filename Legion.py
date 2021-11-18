@@ -571,7 +571,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "-a",
         "--adaptive",
-        type=int,
+        type=bool,
         default=True,
         help="adaptively increase maximum trace length (default: true if -m is not given",
     )
@@ -674,7 +674,7 @@ if __name__ == "__main__":
                 maxlen = args.maxlen
 
             code, outs, errs, symcc_log, verifier_out = execute_with_input(
-                binary, prefix, "traces/" + stem, "trace", args.timeout, maxlen
+                binary, prefix, "traces/" + stem, i, args.timeout, maxlen
             )
 
             if -31 <= code and code < 0:

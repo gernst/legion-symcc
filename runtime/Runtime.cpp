@@ -161,8 +161,6 @@ void _sym_unsupported() {
 }
 
 void _sym_initialize(void) {
-    printf("Hello from initialize\n");
-    raise(SIGKILL);
     if (initialized.test_and_set())
         return;
 
@@ -198,12 +196,15 @@ Expr * _sym_build_integer128(uint64_t high, uint64_t low) {
 }
 
 Expr * _sym_build_float(double value, int is_double) {
+    // // std::cerr << "_sym_build_float(" << value << ", " << is_double << ")" << std::endl;
     if(is_double) {
         double d = (double) value;
-        return _sym_build_integer(*(reinterpret_cast<uint64_t*>(&d)), 64);
+        Expr *a = _sym_build_integer(*(reinterpret_cast<uint64_t*>(&d)), 64);
+        return _sym_build_bits_to_float(a, 1);
     } else {
         float f = (float) value;
-        return _sym_build_integer(*(reinterpret_cast<uint32_t*>(&f)), 32);
+        Expr *a  =_sym_build_integer(*(reinterpret_cast<uint32_t*>(&f)), 32);
+        return _sym_build_bits_to_float(a, 0);
     }
 }
 
@@ -294,8 +295,8 @@ BINARY(float_ordered_less_than, "fp.lt", ZERO2)
 BINARY(float_ordered_less_equal, "fp.leq", ZERO2)
 BINARY(float_ordered_equal, "fp.eq", ZERO2)
 
-UNARY(fp_abs, "fp.abs", SAME1)
-UNARY(fp_isNaN, "fp.isNaN", SAME1)
+UNARY(fp_abs,   "fp.abs",   SAME1)
+UNARY(fp_isNaN, "fp.isNaN", ZERO1)
 
 BINARY_RM(fp_add, "fp.add", SAME2)
 BINARY_RM(fp_sub, "fp.sub", SAME2)
@@ -346,31 +347,42 @@ const char *to_fp(int is_double, int is_signed) {
 }
 
 Expr * _sym_build_int_to_float(Expr * value, int is_double, int is_signed) {
+    // std::cerr << "_sym_build_int_to_float(" << *value << ", " << is_double << "," << is_signed << ")" << std::endl;
     auto *fun = to_fp(is_double, is_signed);
     return EXPR(fun, is_double ? 64 : 32, &g_rm, value);    
 }
 
 
 Expr * _sym_build_float_to_float(Expr * expr, int to_double) {
+    // std::cerr << "_sym_build_float_to_float(" << *expr << ", " << to_double << ")" << std::endl;
     auto *fun = to_fp(to_double, 0);
     return EXPR(fun, to_double ? 64 : 32, &g_rm, expr);    
 }
 
 Expr * _sym_build_bits_to_float(Expr * expr, int to_double) {
+    if (expr == nullptr)
+        return nullptr;
+    // std::cerr << "_sym_build_bits_to_float(" << *expr << ", " << to_double << ")" << std::endl;
     auto *fun = to_fp(to_double, 0);
-    return EXPR(fun, to_double ? 64 : 32, expr);
+    return EXPR(fun, to_double ? 64 : 32, &g_rm, expr);
 }
 
 Expr * _sym_build_float_to_bits(Expr * expr) {
+    if (expr == nullptr)
+        return nullptr;
+
+    // std::cerr << "_sym_build_float_to_bits(" << expr << " = " << *expr << ")" << std::endl;
     return EXPR("fp.to_ieee_bv", expr->bits, expr);
 }
 
 Expr * _sym_build_float_to_signed_integer(Expr * expr, uint8_t bits) {
+    // std::cerr << "_sym_build_float_to_signed_integer(" << *expr << ", " << bits << ")" << std::endl;
     std::string fun = "(_ to_sbv " + decimal(bits) + ")";
     return EXPR(fun, bits, &g_rm_zero, expr);
 }
 
 Expr * _sym_build_float_to_unsigned_integer(Expr * expr, uint8_t bits) {
+    // std::cerr << "_sym_build_float_to_unsigned_integer(" << *expr << ", " << bits << ")" << std::endl;
     std::string fun = "(_ to_ubv " + decimal(bits) + ")";
     return EXPR(fun, bits, &g_rm_zero, expr);
 }

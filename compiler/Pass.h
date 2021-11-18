@@ -23,7 +23,7 @@ class SymbolizePass : public llvm::FunctionPass {
 public:
   static char ID;
 
-  SymbolizePass() : FunctionPass(ID) {}
+  SymbolizePass() : FunctionPass(ID) { }
 
   bool doInitialization(llvm::Module &M) override;
   bool runOnFunction(llvm::Function &F) override;

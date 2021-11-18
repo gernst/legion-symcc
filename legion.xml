@@ -10,8 +10,9 @@
   <option name="-i">50</option>
   <option name="-t">1</option>
   <option name="-c" />
+  <option name="--verbose" />
 
-  <resultfiles>**.xml</resultfiles>
+  <resultfiles>**.xml,**.txt</resultfiles>
 
   <!-- <rundefinition name="test-comp19_prop-coverage-error-call">
     <propertyfile>../sv-benchmarks/c/properties/coverage-error-call.prp</propertyfile>
@@ -20,6 +21,9 @@
   <rundefinition name="test-comp19_prop-coverage-branches">
     <propertyfile>../sv-benchmarks/c/properties/coverage-branches.prp</propertyfile>
   </rundefinition>
+  <tasks name="Debug">
+    <includesfile>Debug.set</includesfile>
+  </tasks>
   <tasks name="ReachSafety-Arrays">
     <includesfile>../sv-benchmarks/c/ReachSafety-Arrays.set</includesfile>
   </tasks>
@@ -33,9 +37,9 @@
     <includesfile>../sv-benchmarks/c/ReachSafety-ECA.set</includesfile>
     <excludesfile>excludes/ReachSafety-ECA-excludes.set</excludesfile>
   </tasks>
-  <!-- <tasks name="ReachSafety-Floats">
+  <tasks name="ReachSafety-Floats">
     <includesfile>../sv-benchmarks/c/ReachSafety-Floats.set</includesfile>
-  </tasks> -->
+  </tasks>
   <tasks name="ReachSafety-Heap">
     <includesfile>../sv-benchmarks/c/ReachSafety-Heap.set</includesfile>
   </tasks>
