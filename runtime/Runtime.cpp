@@ -117,6 +117,8 @@ namespace {
     Expr g_zero("0", 0, nullptr);
     Expr g_bit0("#b0", 1, nullptr);
 
+    Expr g_rm("roundNearestTiesToEven", 0, nullptr);
+
     const char *status = "exit";
 
     size_t traceLength;
@@ -153,12 +155,13 @@ void _sym_timeout(int) {
 }
 
 void _sym_unsupported() {
-    *out << std::endl; // clear any partial output
-    *out << "unsupported" << std::endl;
-    hard_shutdown();
+    status = "unsupported";
+    exit(0);
 }
 
 void _sym_initialize(void) {
+    printf("Hello from initialize\n");
+    raise(SIGKILL);
     if (initialized.test_and_set())
         return;
 
@@ -177,8 +180,8 @@ void _sym_initialize(void) {
     }
 
     signal(SIGABRT, _sym_abort);
-    signal(SIGSEGV, _sym_segfault); // may be a leaf, we do not know!
-    signal(SIGBUS, _sym_segfault); // may be a leaf, we do not know!
+    signal(SIGSEGV, _sym_segfault);
+    signal(SIGBUS, _sym_segfault);
 
     atexit(_sym_finalize);
 }
@@ -240,6 +243,10 @@ SymExpr _sym_build_##name(SymExpr a) \
 SymExpr _sym_build_##name(SymExpr a, SymExpr b) \
 { return  EXPR(fun, f(fun, a, b), a, b); }
 
+#define BINARY_RM(name, fun, f) \
+SymExpr _sym_build_##name(SymExpr a, SymExpr b) \
+{ return  EXPR(fun, f(fun, a, b), &g_rm, a, b); }
+
 BINARY(equal, "=", ZERO2)
 
 UNARY(bool_not, "not", ZERO1)
@@ -275,29 +282,43 @@ BINARY(unsigned_less_equal, "bvule", ZERO2)
 BINARY(unsigned_greater_than, "bvugt", ZERO2)
 BINARY(unsigned_greater_equal, "bvuge", ZERO2)
 
-BINARY(float_ordered_greater_than, "fpa_gt", ZERO2)
-BINARY(float_ordered_greater_equal, "fpa_geq", ZERO2)
-BINARY(float_ordered_less_than, "fpa_lt", ZERO2)
-BINARY(float_ordered_less_equal, "fpa_leq", ZERO2)
-BINARY(float_ordered_equal, "fpa_eq", ZERO2)
+BINARY(float_ordered_greater_than, "fp.gt", ZERO2)
+BINARY(float_ordered_greater_equal, "fp.geq", ZERO2)
+BINARY(float_ordered_less_than, "fp.lt", ZERO2)
+BINARY(float_ordered_less_equal, "fp.leq", ZERO2)
+BINARY(float_ordered_equal, "fp.eq", ZERO2)
 
 UNARY(fp_abs, "fp.abs", SAME1)
 
-// Expr * _sym_build_fp_abs(Expr * a) { _sym_unsupported(); return nullptr; }
-Expr * _sym_build_fp_add(Expr * a, Expr * b) { _sym_unsupported(); return nullptr; }
-Expr * _sym_build_fp_sub(Expr * a, Expr * b) { _sym_unsupported(); return nullptr; }
-Expr * _sym_build_fp_mul(Expr * a, Expr * b) { _sym_unsupported(); return nullptr; }
-Expr * _sym_build_fp_div(Expr * a, Expr * b) { _sym_unsupported(); return nullptr; }
-Expr * _sym_build_fp_rem(Expr * a, Expr * b) { _sym_unsupported(); return nullptr; }
-Expr * _sym_build_float_ordered_not_equal(Expr * a, Expr * b) { _sym_unsupported(); return nullptr; }
-Expr * _sym_build_float_ordered(Expr * a, Expr * b) { _sym_unsupported(); return nullptr; }
-Expr * _sym_build_float_unordered(Expr * a, Expr * b) { _sym_unsupported(); return nullptr; }
-Expr * _sym_build_float_unordered_greater_than(Expr * a, Expr * b) { _sym_unsupported(); return nullptr; }
-Expr * _sym_build_float_unordered_greater_equal(Expr * a, Expr * b) { _sym_unsupported(); return nullptr; }
-Expr * _sym_build_float_unordered_less_than(Expr * a, Expr * b) { _sym_unsupported(); return nullptr; }
-Expr * _sym_build_float_unordered_less_equal(Expr * a, Expr * b) { _sym_unsupported(); return nullptr; }
-Expr * _sym_build_float_unordered_equal(Expr * a, Expr * b) { _sym_unsupported(); return nullptr; }
-Expr * _sym_build_float_unordered_not_equal(Expr * a, Expr * b) { _sym_unsupported(); return nullptr; }
+BINARY_RM(fp_add, "fp.add", SAME2)
+BINARY_RM(fp_sub, "fp.sub", SAME2)
+BINARY_RM(fp_mul, "fp.mul", SAME2)
+BINARY_RM(fp_div, "fp.div", SAME2)
+BINARY   (fp_rem, "fp.rem", SAME2)
+
+Expr * _sym_build_float_ordered_not_equal(Expr * a, Expr * b) {
+    return _sym_build_bool_not(_sym_build_float_ordered_equal(a, b));
+}
+
+Expr * _sym_build_float_ordered(Expr * a, Expr * b) {
+    return _sym_build_bool_not(_sym_build_float_unordered(a, b));
+}
+
+Expr * _sym_build_float_unordered(Expr * a, Expr * b) {
+    return _sym_build_bool_or(EXPR("fp.isNaN", 0, a), EXPR("fp.isNaN", 0, b));
+}
+
+#define UNORDERED(name) \
+SymExpr _sym_build_float_unordered_##name(SymExpr a, SymExpr b) \
+{ return _sym_build_bool_or(_sym_build_float_unordered(a, b), _sym_build_float_ordered_##name(a, b)); }
+
+UNORDERED(greater_than)
+UNORDERED(greater_equal)
+UNORDERED(less_than)
+UNORDERED(less_equal)
+UNORDERED(equal)
+UNORDERED(not_equal)
+
 Expr * _sym_build_int_to_float(Expr * value, int is_double, int is_signed) { _sym_unsupported(); return nullptr; }
 Expr * _sym_build_float_to_float(Expr * expr, int to_double) { _sym_unsupported(); return nullptr; }
 Expr * _sym_build_bits_to_float(Expr * expr, int to_double) { _sym_unsupported(); return nullptr; }
