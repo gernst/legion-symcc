@@ -118,6 +118,7 @@ namespace {
     Expr g_bit0("#b0", 1, nullptr);
 
     Expr g_rm("roundNearestTiesToEven", 0, nullptr);
+    Expr g_rm_zero("roundTowardZero", 0, nullptr);
 
     const char *status = "exit";
 
@@ -197,8 +198,13 @@ Expr * _sym_build_integer128(uint64_t high, uint64_t low) {
 }
 
 Expr * _sym_build_float(double value, int is_double) {
-    _sym_unsupported();
-    return nullptr;
+    if(is_double) {
+        double d = (double) value;
+        return _sym_build_integer(*(reinterpret_cast<uint64_t*>(&d)), 64);
+    } else {
+        float f = (float) value;
+        return _sym_build_integer(*(reinterpret_cast<uint32_t*>(&f)), 32);
+    }
 }
 
 Expr * _sym_get_input_byte(size_t offset) {
@@ -289,12 +295,14 @@ BINARY(float_ordered_less_equal, "fp.leq", ZERO2)
 BINARY(float_ordered_equal, "fp.eq", ZERO2)
 
 UNARY(fp_abs, "fp.abs", SAME1)
+UNARY(fp_isNaN, "fp.isNaN", SAME1)
 
 BINARY_RM(fp_add, "fp.add", SAME2)
 BINARY_RM(fp_sub, "fp.sub", SAME2)
 BINARY_RM(fp_mul, "fp.mul", SAME2)
 BINARY_RM(fp_div, "fp.div", SAME2)
 BINARY   (fp_rem, "fp.rem", SAME2)
+
 
 Expr * _sym_build_float_ordered_not_equal(Expr * a, Expr * b) {
     return _sym_build_bool_not(_sym_build_float_ordered_equal(a, b));
@@ -304,8 +312,12 @@ Expr * _sym_build_float_ordered(Expr * a, Expr * b) {
     return _sym_build_bool_not(_sym_build_float_unordered(a, b));
 }
 
+Expr * _sym_build_not_equal(Expr * a, Expr * b) {
+    return _sym_build_bool_not(_sym_build_equal(a, b));
+}
+
 Expr * _sym_build_float_unordered(Expr * a, Expr * b) {
-    return _sym_build_bool_or(EXPR("fp.isNaN", 0, a), EXPR("fp.isNaN", 0, b));
+    return _sym_build_bool_or(_sym_build_fp_isNaN(a), _sym_build_fp_isNaN(b));
 }
 
 #define UNORDERED(name) \
@@ -319,12 +331,49 @@ UNORDERED(less_equal)
 UNORDERED(equal)
 UNORDERED(not_equal)
 
-Expr * _sym_build_int_to_float(Expr * value, int is_double, int is_signed) { _sym_unsupported(); return nullptr; }
-Expr * _sym_build_float_to_float(Expr * expr, int to_double) { _sym_unsupported(); return nullptr; }
-Expr * _sym_build_bits_to_float(Expr * expr, int to_double) { _sym_unsupported(); return nullptr; }
-Expr * _sym_build_float_to_bits(Expr * expr) { _sym_unsupported(); return nullptr; }
-Expr * _sym_build_float_to_signed_integer(Expr * expr, uint8_t bits) { _sym_unsupported(); return nullptr; }
-Expr * _sym_build_float_to_unsigned_integer(Expr * expr, uint8_t bits) { _sym_unsupported(); return nullptr; }
+const char *to_fp(int is_double, int is_signed) {
+    if(is_signed) {
+        if(!is_double)
+            return "(_ to_fp  8 24)";
+        else
+            return "(_ to_fp 11 53)";
+    } else {
+        if(!is_double)
+            return "(_ to_fp_unsigned  8 24)";
+        else
+            return "(_ to_fp_unsigned 11 53)";
+    }
+}
+
+Expr * _sym_build_int_to_float(Expr * value, int is_double, int is_signed) {
+    auto *fun = to_fp(is_double, is_signed);
+    return EXPR(fun, is_double ? 64 : 32, &g_rm, value);    
+}
+
+
+Expr * _sym_build_float_to_float(Expr * expr, int to_double) {
+    auto *fun = to_fp(to_double, 0);
+    return EXPR(fun, to_double ? 64 : 32, &g_rm, expr);    
+}
+
+Expr * _sym_build_bits_to_float(Expr * expr, int to_double) {
+    auto *fun = to_fp(to_double, 0);
+    return EXPR(fun, to_double ? 64 : 32, expr);
+}
+
+Expr * _sym_build_float_to_bits(Expr * expr) {
+    return EXPR("fp.to_ieee_bv", expr->bits, expr);
+}
+
+Expr * _sym_build_float_to_signed_integer(Expr * expr, uint8_t bits) {
+    std::string fun = "(_ to_sbv " + decimal(bits) + ")";
+    return EXPR(fun, bits, &g_rm_zero, expr);
+}
+
+Expr * _sym_build_float_to_unsigned_integer(Expr * expr, uint8_t bits) {
+    std::string fun = "(_ to_ubv " + decimal(bits) + ")";
+    return EXPR(fun, bits, &g_rm_zero, expr);
+}
 
 Expr * _sym_build_bool_to_bits(Expr * expr, uint8_t bits) {
     Expr * one = _sym_build_integer(1, bits);
@@ -338,10 +387,6 @@ Expr * _sym_build_bool_to_bits(Expr * expr, uint8_t bits) {
             assert(expr->bits == 0 || expr->bits == 1);
             return nullptr;
     }
-}
-
-Expr * _sym_build_not_equal(Expr * a, Expr * b) {
-    return _sym_build_bool_not(_sym_build_equal(a, b));
 }
 
 Expr * _sym_build_sext(Expr * expr, uint8_t bits) {
