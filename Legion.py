@@ -190,10 +190,7 @@ class Arm:
         self.selected = 0
 
     def score(self, N):
-        if self.node.is_leaf:
-            return -inf
-        else:
-            return uct(self.reward, self.selected, N)
+        return uct(self.reward, self.selected, N)
 
     def descr(self, N):
         return "uct(%d, %d, %d)" % (self.reward, self.selected, N)
@@ -217,35 +214,11 @@ class Node:
         self.sampler = None
 
         self.is_phantom = True
-        self.is_leaf = False
 
         # statistics collected for sampling in this node and subtree, respectively
         self.here = Arm(self)
         self.tree = Arm(self)
 
-    def check_invariants(self):
-        try:
-            if self.parent:
-                assert self.target
-
-            if self.is_phantom:
-                assert not self.site
-                assert not self.is_leaf
-                assert not self.yes
-                assert not self.no
-            elif self.is_leaf:
-                assert not self.yes
-                assert not self.no
-            else:
-                assert self.site
-                assert self.yes
-                assert self.no
-
-                self.yes.check_invariants()
-                self.no.check_invariants()
-        except AssertionError as e:
-            print("!", self.path)
-            raise e
 
     def propagate(self, reward, selected, here=True):
         if here:  # to this node
@@ -266,7 +239,6 @@ class Node:
             # print(index)
             was_phantom = node.is_phantom
 
-            assert not node.is_leaf
             site, target, polarity, phi = trace[index]
 
             if was_phantom:
@@ -287,10 +259,6 @@ class Node:
                     base = node
 
             node = node.yes if polarity else node.no
-
-        if is_complete:
-            node.is_leaf = True
-            node.is_phantom = False
 
         return base, node
 
@@ -314,9 +282,7 @@ class Node:
             return None
 
     def select(self, bfs):
-        if self.is_leaf:
-            return self
-        elif self.is_phantom:
+        if self.is_phantom:
             return self
         else:
             if bfs:
@@ -358,8 +324,6 @@ class Node:
     def pp(self):
         if not self.parent:
             key = "*"
-        elif self.is_leaf:
-            key = "$"
         elif self.is_phantom:
             key = "?"
         else:
@@ -673,19 +637,10 @@ if __name__ == "__main__":
 
         try:
             # root.pp()
-            if args.verbose:
-                print("checking invariants")
-            root.check_invariants()
 
             if args.verbose:
                 print("selecting")
             node = root.select(BFS)
-
-            if node.is_leaf:
-                node.propagate(0, 1)
-                if args.verbose:
-                    print("$", node.path.ljust(32))
-                continue
 
             if args.verbose:
                 print("sampling...")
