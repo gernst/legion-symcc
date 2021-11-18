@@ -7,7 +7,8 @@
   <option name="-L">ubuntu2004/lib</option>
   <!-- <option name="-t">1</option>
   <option name="-m">100</option> -->
-  <option name="-i">1000</option> -->
+  <option name="-i">50</option>
+  <option name="-t">1</option>
   <option name="-c" />
 
   <resultfiles>**.xml</resultfiles>

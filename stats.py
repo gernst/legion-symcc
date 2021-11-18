@@ -94,7 +94,7 @@ if __name__ == "__main__":
     print(";".join(header))
 
     for category in categories:
-        row = [category] + [str(sum(table[date][category])) for date in dates]
+        row = [category] + [str(sum(table[date][category])) if category in table[date] else "" for date in dates]
         print(";".join(row))
     
     footer = [""] + [str(score_normalized(table[date])) for date in dates]
