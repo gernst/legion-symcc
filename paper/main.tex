@@ -1,0 +1,116 @@
+\documentclass{llncs}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[scaled=0.8]{beramono}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{stmaryrd}
+\usepackage{mathtools}
+\usepackage{tabto}
+\usepackage{comment}
+\usepackage{xspace}
+\usepackage{todonotes}
+
+\usepackage{hyperref}
+\hypersetup{allcolors=blue,colorlinks=true}
+
+\usepackage{cleveref}
+% \usepackage[numbers,sort&compress]{natbib}
+\newcommand{\mailto}[1]{\href{mailto:#1}{\ttfamily #1}}
+
+\newcommand{\code}[1]{\texttt{#1}}
+
+\newcommand{\Legion}{\textsc{Legion}\xspace}
+\newcommand{\SymCC}{\textsc{SymCC}\xspace}
+\newcommand{\Angr}{\texttt{angr}\xspace}
+
+\author{
+    Gidon Ernst
+        \inst{1} \thanks{Jury Member}
+\and
+    Dongge Liu
+        \inst{2}
+\and
+    Toby Murray
+        \inst{2}
+\and
+    Thuan Pham
+        \inst{2}
+}
+
+\title{\Legion/\SymCC---Tool Description \\ (Competition Contribution)}
+
+\institute{
+    LMU Munich, \mailto{gidon.ernst@lmu.de}
+\and
+    University of Melbourne,
+    \mailto{donggel@student.unimelb.edu.au},
+    \mailto{toby.murray@unimelb.edu.au},
+    \mailto{thuan.pham@unimelb.edu.au}
+}
+\pagestyle{plain}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+
+\end{abstract}
+    \keywords{Fuzz Testing \and Concolic Execution}
+
+\section{Testing Approach}
+\label{sec:approach}
+
+\Legion/\SymCC implements a testing strategy similar to \Legion:
+The program is explored through concrete executions where the nondeterministic input values are in part precomputed and in part randomly generated.
+High coverage is achieved by making informed decisions about which parts of the program should be executed next.
+To that end, both versions of \Legion maintain a \emph{tree model} of execution traces, where internal nodes correspond to branching points in the program's machine code.
+Nodes in the tree are annotated by the respective symbolic path constraints.
+\Legion's main loop consists of four stages:
+select a node from the tree accoring to a \emph{score function},
+solve its path constraint to obtain an input prefix that triggers that node during execution,
+run the binary such that all further nondeterministic choices are done randomly,
+and finally collect a trace of the execution and integrate it into the tree.
+\Legion therefore leverages \emph{symbolic constraint solving} to pass through
+narrow choke points in the program (e.g. magic numbers),
+and \emph{random fuzzing} to cheaply cover those parts of the program that are easy to target.
+
+
+\section{Software Architecture}
+\label{sec:architecture}
+
+\Legion/\SymCC started out as an attempt to implement the original \Legion algorithm 
+using \SymCC as a backend instead of \Angr.
+\Legion/\SymCC is in large parts a re-implementation, because \SymCC works fundamentally different to \Angr:
+Binary execution and generation of symbolic constraints is merged in a single step, which greatly simplifies the design and avoids mismatches between the two.
+As a consequence, \SymCC is much faster.
+
+The high-level algorithm of \Legion/\SymCC is implemented as a Python program.
+The binary itself is instrumented by the \SymCC compiler pass and a custom runtime
+that has been redesigned from scratch and stores a trace of the execution in a logfile.
+This trace consists of information how many bytes of input have been read so far,
+and the symbolic constraints of each branching point with flag whether the branch had been taken or not, in SMT-LIB syntax.
+
+\section{Discussion: Strengths and Weaknesses}
+\label{sec:discussion}
+
+\section{Tool Setup and Configuration}
+\label{sec:project}
+
+
+\paragraph{Configuration.}
+
+\paragraph{Participation.}
+\Legion/\SymCC participates in all categories of \code{Cover-Branches}.
+
+\paragraph{Contributors \& Acknowledgement.}
+
+\Legion/\SymCC is developed and maintained by the authors.
+The source code is available via \url{https://github.com/gernst/legion-symcc} under the MIT license.
+The original \Legion implementation is available at \url{https://github.com/Alan32Liu/Legion} under the MIT license.
+
+\bibliographystyle{splncs04}
+\bibliography{korn.bib}
+
+\end{document}
