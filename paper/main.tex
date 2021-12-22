@@ -12,7 +12,6 @@
 \usepackage{todonotes}
 
 \usepackage{hyperref}
-\hypersetup{allcolors=blue,colorlinks=true}
 
 \usepackage{cleveref}
 % \usepackage[numbers,sort&compress]{natbib}
@@ -23,6 +22,10 @@
 \newcommand{\Legion}{\textsc{Legion}\xspace}
 \newcommand{\SymCC}{\textsc{SymCC}\xspace}
 \newcommand{\Angr}{\texttt{angr}\xspace}
+
+\pagestyle{plain}
+\hypersetup{allcolors=blue,colorlinks=true}
+\hypersetup{pdftitle=Legion/SymCC---Tool Description (Competition Contribution}
 
 \author{
     Gidon Ernst
@@ -48,16 +51,25 @@
     \mailto{toby.murray@unimelb.edu.au},
     \mailto{thuan.pham@unimelb.edu.au}
 }
-\pagestyle{plain}
 
 \begin{document}
 
 \maketitle
 
 \begin{abstract}
+\Legion is a grey-box coverage-based concolic tool that
+balances the complementary nature of fuzzing and symbolic execution
+to achieve the best of both worlds.
+It uses a variation of Monte Carlo tree search (MCTS)
+that formulates program exploration as sequential decision-making
+under uncertainty.
+\Legion/\SymCC is a fresh implementation of this idea using the
+efficient \SymCC backend.
+We report on the design, implementation concerns, tradeoffs, and lessons learned.
+
 
 \end{abstract}
-    \keywords{Fuzz Testing \and Concolic Execution}
+    \keywords{Fuzz Testing \and Concolic Execution \and Monte Carlo Search}
 
 \section{Testing Approach}
 \label{sec:approach}
@@ -92,7 +104,7 @@ that has been redesigned from scratch and stores a trace of the execution in a l
 This trace consists of information how many bytes of input have been read so far,
 and the symbolic constraints of each branching point with flag whether the branch had been taken or not, in SMT-LIB syntax.
 
-\section{Discussion: Strengths and Weaknesses}
+\section{Strengths and Weaknesses}
 \label{sec:discussion}
 
 \section{Tool Setup and Configuration}
