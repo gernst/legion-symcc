@@ -530,6 +530,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "-c", "--coverage", action="store_true", help="generate coverage information"
     )
+    parser.add_argument("-e", "--error", action="store_true", help="execute in cover-error mode")
     parser.add_argument("-r", "--rho", type=int, help="exploration factor (default: 1)")
     parser.add_argument("-s", "--seed", type=int, default=0, help="random seed")
     parser.add_argument("-q", "--quiet", action="store_true", help="less output")
