@@ -1,6 +1,6 @@
 import subprocess as sp
 import threading
-from Legion_helpFunctions import random_bytes
+from helper import random_bytes
 
 BITS = 64
 

@@ -9,9 +9,9 @@ import signal
 
 from math import sqrt, log, ceil, inf
 
-from Legion_helpFunctions import *
-from Legion_execution import *
-from Legion_ArmAndNode import *
+from legion.helper import *
+from legion.execution import *
+from legion.tree import *
 
 BFS = True
 RHO = 1
@@ -183,6 +183,10 @@ if __name__ == "__main__":
                 print("signal: ", signal.Signals(-code).name)
             elif code != 0:
                 print("return code: ", code)
+                #Hier soll reach_error() abgefangen werden
+                if code == 1:
+                    print("reach_error() detected.")
+                    break
 
             if outs:
                 if args.verbose:
