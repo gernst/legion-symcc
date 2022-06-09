@@ -1,6 +1,6 @@
 import z3
 import random
-from Legion_helpFunctions import *
+from legion.helper import *
 from math import inf, sqrt, log
 
 INPUTS = set()

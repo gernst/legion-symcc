@@ -1,4 +1,5 @@
 import random
+import argparse
 import subprocess as sp
 import datetime
 import os
@@ -202,3 +203,74 @@ def trace_from_file(trace):
             result[i] = (site, target, polarity, constraints[index])
 
         return (is_complete, last, result)
+
+def parseArguments():
+    parser = argparse.ArgumentParser(description="Legion")
+    # parser.add_argument("-c", "--compile",
+    #                     action='store_true',
+    #                     help='compile binary (requires modified symcc on path, otherwise assume it has been compiled before)')
+    parser.add_argument("file", help="C source file")
+    parser.add_argument(
+        "-c", "--coverage", action="store_true", help="generate coverage information"
+    )
+    parser.add_argument("-e", "--error", action="store_true", help="execute in cover-error mode")
+    parser.add_argument("-r", "--rho", type=int, help="exploration factor (default: 1)")
+    parser.add_argument("-s", "--seed", type=int, default=0, help="random seed")
+    parser.add_argument("-q", "--quiet", action="store_true", help="less output")
+    parser.add_argument("-V", "--verbose", action="store_true", help="more output")
+    parser.add_argument("-z", "--zip", action="store_true", help="zip test suite")
+    parser.add_argument(
+        "-64",
+        dest="m64",
+        action="store_true",
+        help="compile with -m64 (override platform default)",
+    )
+    parser.add_argument(
+        "-32",
+        dest="m32",
+        action="store_true",
+        help="compile with -m32 (override platform default)",
+    )
+    parser.add_argument(
+        "-i",
+        "--iterations",
+        type=int,
+        default=None,
+        help="number of iterations (samples to generate)",
+    )
+    parser.add_argument(
+        "-t",
+        "--timeout",
+        type=int,
+        default=3,
+        help="binary execution timeout in seconds (default: 3)",
+    )
+    parser.add_argument(
+        "-m",
+        "--maxlen",
+        type=int,
+        default=None,
+        help="maximum trace length (default: none)",
+    )
+    parser.add_argument(
+        "-a",
+        "--adaptive",
+        type=bool,
+        default=True,
+        help="adaptively increase maximum trace length (default: true if -m is not given",
+    )
+    parser.add_argument(
+        "-L",
+        dest="library",
+        default="lib",
+        help="location of SymCC compiler and runtime libraries",
+    )
+    parser.add_argument(
+        "-T",
+        "--testcov",
+        action="store_true",
+        help="run testcov (implies -z)",
+    )
+
+    args = parser.parse_args()
+    return args
