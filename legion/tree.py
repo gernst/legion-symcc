@@ -1,10 +1,11 @@
 import z3
 import random
-from legion.helper import *
 from math import inf, sqrt, log
 
-INPUTS = set()
+from legion.helper import int_to_bytes
+
 KNOWN = set()
+INPUTS = set()
 RHO = 1
 
 class Arm:

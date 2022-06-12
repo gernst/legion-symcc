@@ -1,9 +1,7 @@
 #!/usr/bin/python3
 
-import argparse
 import os
 import random
-import subprocess as sp
 import sys
 import signal
 
@@ -15,9 +13,18 @@ from legion.tree import *
 
 BFS = True
 RHO = 1
-INPUTS = set()
-KNOWN = set()
 VERSION = "testcomp2022"
+BITS = 64
+
+
+def zip_files(file, paths):
+    run("zip", "-r", file, *paths)
+    print()
+
+
+def interrupt(number, frame):
+    print("received SIGTERM")
+    raise StopIteration()
 
 
 if __name__ == "__main__":
@@ -44,7 +51,7 @@ if __name__ == "__main__":
 
     if is_c:
         binary = source[:-2]
-        compile_symcc(args.library, source, binary, args.coverage)
+        compile_symcc(args.library, source, binary, BITS, args.coverage)
     else:
         binary = source
         source = binary + ".c"
@@ -54,7 +61,7 @@ if __name__ == "__main__":
     stem = os.path.basename(binary)
     root = Node([], "", [], [])
 
-    write_metadata(source, "tests/" + stem)
+    write_metadata(source, "tests/" + stem, BITS)
 
     # try:
     i = 0
