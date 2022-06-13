@@ -140,6 +140,13 @@ void _sym_finalize(void) {
     // hard_shutdown();
 }
 
+/* reach_error
+void _sym_reach_error(int code){
+    status = "error(1)";
+    exit(1);
+}
+*/
+
 void _sym_abort(int code) {
     status = "abort";
     exit(0);

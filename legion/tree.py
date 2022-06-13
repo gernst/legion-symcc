@@ -6,7 +6,6 @@ from legion.helper import int_to_bytes
 
 KNOWN = set()
 INPUTS = set()
-RHO = 1
 
 class Arm:
     def __init__(self, node):
@@ -15,8 +14,8 @@ class Arm:
         self.reward = 0
         self.selected = 0
 
-    def score(self, N):
-        return uct(self.reward, self.selected, N)
+    def score(self, N, RHO):
+        return uct(self.reward, self.selected, N, RHO)
 
     def descr(self, N):
         return "uct(%d, %d, %d)" % (self.reward, self.selected, N)
@@ -107,7 +106,7 @@ class Node:
         except StopIteration:
             return None
 
-    def select(self, bfs):
+    def select(self, bfs, RHO):
         if self.is_phantom:
             return self
         else:
@@ -125,7 +124,7 @@ class Node:
             best = -inf
 
             for arm in options:
-                cur = arm.score(N)
+                cur = arm.score(N, RHO)
 
                 if cur == best:
                     candidates.append(arm)
@@ -141,6 +140,7 @@ class Node:
                 return node
             else:
                 return node.select(bfs)
+
     def pp_legend(self):
         print("              local              subtree")
         print("    score  win  try      score  win  try    path")
@@ -173,7 +173,7 @@ class Node:
                 
 
 # higher is better
-def uct(w, n, N):
+def uct(w, n, N, RHO):
     if not n:
         return inf
     else:
