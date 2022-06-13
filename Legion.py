@@ -83,7 +83,7 @@ if __name__ == "__main__":
 
             if args.verbose:
                 print("selecting")
-            node = root.select(BFS, RHO)
+            node = root.select(node, BFS, RHO)
 
             if args.verbose:
                 print("sampling...")
