@@ -181,11 +181,14 @@ if __name__ == "__main__":
                 node.propagate(0, 1)
 
             if added:
-                if args.verbose:
-                    print("write testcase", verifier_out)
-                write_testcase(verifier_out, "tests/" + stem, i)
-                ntestcases += 1
-                print("+", leaf.path)
+                if not args.error or code == 1:
+                    if args.verbose:
+                        print("write testcase", verifier_out)
+                    write_testcase(verifier_out, "tests/" + stem, i)
+                    ntestcases += 1
+                    if code == 1 and args.error:
+                        print("+", leaf.path)
+                        break
             elif not leaf.path.startswith(node.path):
                 print("!", leaf.path)  # missed a prefix
                 # raise Exception("failed to preserve prefix (naive sampler is precise)")
