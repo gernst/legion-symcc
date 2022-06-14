@@ -1,5 +1,6 @@
 #!/usr/bin/python3
 
+# Handle the required imports
 import os
 import random
 import sys
@@ -11,6 +12,7 @@ from legion.helper import *
 from legion.execution import *
 from legion.tree import *
 
+# constants
 BFS = True
 RHO = 1
 VERSION = "testcomp2022"
@@ -27,13 +29,15 @@ def interrupt(number, frame):
     raise StopIteration()
 
 
-if __name__ == "__main__":
+if __name__ == "__main__":   # here is the top-level code executed
+    # print version and finished
     if len(sys.argv) == 2 and (sys.argv[1] == "-v" or sys.argv[1] == "--version"):
         print(VERSION)
         sys.exit(0)
 
     sys.setrecursionlimit(1000 * 1000)
 
+    # parse all the arguments
     args = parseArguments()
 
     random.seed(args.seed)

@@ -125,6 +125,12 @@ namespace {
     size_t traceLength;
 }
 
+/*
+void __assert_fail (const char *__assertion, const char *__file, unsigned int __line, const char *__function) {
+    exit(1);
+}
+*/
+
 void hard_shutdown() {
     fflush(stdout);
     close(0);
@@ -140,12 +146,13 @@ void _sym_finalize(void) {
     // hard_shutdown();
 }
 
-/* reach_error
-void _sym_reach_error(int code){
-    status = "error(1)";
+/*
+void _sym_reach_error(void){
+    status = "reach_error";
     exit(1);
 }
 */
+
 
 void _sym_abort(int code) {
     status = "abort";
@@ -189,6 +196,7 @@ void _sym_initialize(void) {
     signal(SIGSEGV, _sym_segfault);
     signal(SIGBUS, _sym_segfault);
 
+    //atexit(_sym_reach_error);
     atexit(_sym_finalize);
 }
 
