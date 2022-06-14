@@ -1,3 +1,5 @@
+extern const char *status;
+
 extern "C" {
 
 #include <stdio.h>
