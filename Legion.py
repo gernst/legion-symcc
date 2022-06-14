@@ -498,7 +498,7 @@ def compile_symcc(libs, source, binary, coverage=False):
         cmd.append("--coverage")
     cmd.append("-fbracket-depth=1024")
 
-    cmd.extend([source, "__VERIFIER.c", "-o", binary])
+    cmd.extend([source, "-o", binary])
 
     cmd.append("-lstdc++")
     cmd.append("-lm")
@@ -790,7 +790,7 @@ if __name__ == "__main__":
         gcda = stem + ".gcda"
         gcov(gcda)
         try_remove(gcda)
-        try_remove("__VERIFIER.gcda")
+        # try_remove("__VERIFIER.gcda")
 
     if args.testcov or args.zip:
         suite = "tests/" + stem + ".zip"
