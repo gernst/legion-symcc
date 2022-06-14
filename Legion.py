@@ -228,7 +228,7 @@ if __name__ == "__main__":   # here is the top-level code executed
         gcda = stem + ".gcda"
         gcov(gcda)
         try_remove(gcda)
-        try_remove("__VERIFIER.gcda")
+        # try_remove("__VERIFIER.gcda")
 
     if args.testcov or args.zip:
         suite = "tests/" + stem + ".zip"
