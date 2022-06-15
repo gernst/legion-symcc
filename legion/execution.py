@@ -27,7 +27,7 @@ def compile_symcc(libs, source, binary, bits, coverage=False):
         cmd.append("--coverage")
     cmd.append("-fbracket-depth=1024")
 
-    cmd.extend([source, "-o", binary])
+    cmd.extend([source, "__VERIFIER.c", "-o", binary])
 
     cmd.append("-lstdc++")
     cmd.append("-lm")
