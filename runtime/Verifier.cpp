@@ -8,10 +8,10 @@ extern "C" {
 
 extern ssize_t read(int fd, void *buf, size_t count);
 
-void __assert_fail (const char *__assertion, const char *__file,
-      unsigned int __line, const char *__function) {
-    exit(1);
-}
+// void __assert_fail (const char *__assertion, const char *__file,
+//       unsigned int __line, const char *__function) {
+//     exit(1);
+// }
 
 static int initialized = 0;
 static FILE* output;

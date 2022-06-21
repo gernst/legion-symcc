@@ -1,4 +1,4 @@
-CLANG = clang
+CLANG = clang-10
 COMPILER_H   = $(wildcard compiler/*.h)
 COMPILER_CPP = $(wildcard compiler/*.cpp)
 
@@ -18,7 +18,7 @@ lib/libSymRuntime.so: lib $(RUNTIME_CPP) $(RUNTIME_H)
 lib32/libSymRuntime.so: lib32 $(RUNTIME_CPP) $(RUNTIME_H)
 	$(CLANG) -std=c++17 -Wall $(RUNTIME_CPP) -Iruntime -fPIC -shared -o $@ -m32
 
-lib/libSymbolize.so: lib $(COMPILER_CPP) $(COMPILER_H)
+lib/libSymbolize.so: $(COMPILER_CPP) $(COMPILER_H)
 	$(CLANG) -std=c++17 -Wall $(COMPILER_CPP) -Wall -fPIC -D_GNU_SOURCE -D__STDC_CONSTANT_MACROS -D__STDC_FORMAT_MACROS -D__STDC_LIMIT_MACROS -Wl,-z,nodelete -shared -o $@
 
 lib:

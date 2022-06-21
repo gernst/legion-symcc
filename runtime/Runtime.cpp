@@ -120,11 +120,10 @@ namespace {
     Expr g_rm("roundNearestTiesToEven", 0, nullptr);
     Expr g_rm_zero("roundTowardZero", 0, nullptr);
 
+    const char *status = "exit";
+
     size_t traceLength;
 }
-
-const char *status = "exit";
-
 
 void hard_shutdown() {
     fflush(stdout);
@@ -133,6 +132,12 @@ void hard_shutdown() {
     close(2);
     // raise(SIGKILL);
     exit(0);
+}
+
+void __assert_fail (const char *__assertion, const char *__file,
+      unsigned int __line, const char *__function) {
+    status = "error";
+    exit(1);
 }
 
 void _sym_finalize(void) {
@@ -161,6 +166,7 @@ void _sym_unsupported() {
     exit(0);
 }
 
+__attribute__((constructor))
 void _sym_initialize(void) {
     if (initialized.test_and_set())
         return;

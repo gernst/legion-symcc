@@ -481,7 +481,7 @@ def run(*args):
 
 
 def compile_symcc(libs, source, binary, coverage=False):
-    cmd = ["clang"]
+    cmd = ["clang-10"]
 
     cmd.extend(["-Xclang", "-load", "-Xclang", libs + "/libSymbolize.so"])
 

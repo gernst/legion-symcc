@@ -25,6 +25,7 @@
 
 using namespace llvm;
 
+#undef NDEBUG
 #ifndef NDEBUG
 #define DEBUG(X)                                                               \
   do {                                                                         \
@@ -48,10 +49,11 @@ bool SymbolizePass::doInitialization(Module &M) {
   }
 
   // Insert a constructor that initializes the runtime and any globals.
+  /* Seems to be broken :(
   Function *ctor;
   std::tie(ctor, std::ignore) = createSanitizerCtorAndInitFunctions(
       M, kSymCtorName, "_sym_initialize", {}, {});
-  appendToGlobalCtors(M, ctor, 0);
+  appendToGlobalCtors(M, ctor, 0); */
 
   return true;
 }
