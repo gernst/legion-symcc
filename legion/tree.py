@@ -86,6 +86,9 @@ class Node:
 
             node = node.yes if polarity else node.no
 
+        if not base and node.is_phantom:
+            base = node
+
         return base, node
 
     def sample(self):
