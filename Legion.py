@@ -129,9 +129,9 @@ if __name__ == "__main__":   # here is the top-level code executed
             elif code != 0:
                 print("return code: ", code)
                 #Hier soll reach_error() abgefangen werden
-                if code == 1:
-                    print("reach_error() detected.")
-                    break
+                # if code == 1:
+                #     print("reach_error() detected.")
+                #     break
 
             if outs:
                 if args.verbose:
@@ -190,8 +190,9 @@ if __name__ == "__main__":   # here is the top-level code executed
                         print("write testcase", verifier_out)
                     write_testcase(verifier_out, "tests/" + stem, i)
                     ntestcases += 1
+                    print("+", leaf.path)
                     if code == 1 and args.error:
-                        print("+", leaf.path)
+                        print("reach_error() detected.")
                         break
             elif not leaf.path.startswith(node.path):
                 print("!", leaf.path)  # missed a prefix

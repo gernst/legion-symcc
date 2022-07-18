@@ -27,7 +27,7 @@ def compile_symcc(libs, source, binary, bits, coverage=False):
         cmd.append("--coverage")
     cmd.append("-fbracket-depth=1024")
 
-    cmd.extend([source, "__VERIFIER.c", "-o", binary])
+    cmd.extend([source, "Verifier.cpp", "-o", binary])
 
     cmd.append("-lstdc++")
     cmd.append("-lm")
@@ -162,6 +162,11 @@ def trace_from_file(trace):
                 flush()
                 last = line
                 is_complete = True
+
+            elif line.startswith("error"):
+                flush()
+                last = line
+                is_complete = True  # used by benchmark tasks
 
             elif line.startswith("abort"):
                 flush()

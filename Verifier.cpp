@@ -1,6 +1,6 @@
 extern const char *status;
 
-extern "C"{
+extern "C" {
 
     #include <stdio.h>
     #include <stdlib.h>
@@ -10,6 +10,7 @@ extern "C"{
 
     void __assert_fail (const char *__assertion, const char *__file,
         unsigned int __line, const char *__function) {
+        status = "error";
         exit(1);
     }
 
