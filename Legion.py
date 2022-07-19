@@ -71,6 +71,7 @@ if __name__ == "__main__":   # here is the top-level code executed
     i = 0
 
     empty_testcase_written = False
+    reach_error = False
     ntestcases = 0
 
     signal.signal(signal.SIGTERM, interrupt)
@@ -191,7 +192,8 @@ if __name__ == "__main__":   # here is the top-level code executed
                     write_testcase(verifier_out, "tests/" + stem, i)
                     ntestcases += 1
                     print("+", leaf.path)
-                    if code == 1 and args.error:
+                    if last == "error" and args.error:
+                        reach_error = True
                         print("reach_error() detected.")
                         break
             elif not leaf.path.startswith(node.path):
@@ -230,6 +232,9 @@ if __name__ == "__main__":   # here is the top-level code executed
         gcov(gcda)
         try_remove(gcda)
         try_remove("__VERIFIER.gcda")
+
+    if args.error and reach_error:
+        print("score: 1")
 
     if args.testcov or args.zip:
         suite = "tests/" + stem + ".zip"

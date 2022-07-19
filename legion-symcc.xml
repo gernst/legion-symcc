@@ -1,16 +1,20 @@
 <?xml version="1.0"?>
 <!DOCTYPE benchmark PUBLIC "+//IDN sosy-lab.org//DTD BenchExec benchmark 1.9//EN" "http://www.sosy-lab.org/benchexec/benchmark-1.9.dtd">
-<benchmark tool="legion-symcc" displayName="Legion/SymCC" timelimit="15 min" memlimit="15 GB" cpuCores="8">
+<benchmark tool="legion-symcc" displayName="Legion/SymCC" timelimit="15 min" memlimit="7 GB" cpuCores="1">
 
-  <require cpuModel="Intel Xeon E3-1230 v5 @ 3.40 GHz" cpuCores="8" />
+  <!-- <require cpuModel="Intel Xeon E3-1230 v5 @ 3.40 GHz" cpuCores="1" /> -->
+  <!-- <require cpuModel="Intel Core i7-6700 @ 3.40 GHz" cpuCores="1" /> -->
+  <require cpuModel="Intel Core i7-10700" cpuCores="1" />
 
   <resultfiles>**.xml,**.txt</resultfiles>
 
   <rundefinition name="Test-Comp22_coverage-error-call">
+    <option name="-e" />
     <propertyfile>../sv-benchmarks/c/properties/coverage-error-call.prp</propertyfile>
   </rundefinition>
 
   <rundefinition name="Test-Comp22_coverage-branches">
+    <option name="-c" />
     <propertyfile>../sv-benchmarks/c/properties/coverage-branches.prp</propertyfile>
   </rundefinition>
 
